@@ -170,13 +170,13 @@ public class BoostsController : ControllerBase
             PredictionId  = predictionId,
             UserId        = CurrentUserId,
             BoostId       = boostId,
-            EffectPayload = $"{{"from":"{oldOptionId}","to":"{req.NewOptionId}"}}",
+            EffectPayload = $"{{\"from\":\"{oldOptionId}\",\"to\":\"{req.NewOptionId}\"}}",
             IsRevealed    = true,
         });
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = $"Vote corrige : tu mises maintenant sur "{newOption.Label}"." });
+        return Ok(new { message = $"Vote corrige : tu mises maintenant sur \"{newOption.Label}\"." });
     }
 
     // =========================================================
