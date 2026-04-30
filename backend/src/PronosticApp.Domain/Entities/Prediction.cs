@@ -31,6 +31,10 @@ public class Prediction
 
     public bool AllowBoosts { get; set; } = true;
     public bool AllowSabotage { get; set; } = true;
+
+    /// <summary>Si vrai, les stats de vote sont masquées pour tout le monde jusqu'à la résolution.</summary>
+    public bool IsAnonymous { get; set; } = false;
+
     public int BaseReward { get; set; } = 100;
     public int? MaxParticipants { get; set; }
 

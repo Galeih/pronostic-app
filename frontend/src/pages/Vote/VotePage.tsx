@@ -122,12 +122,25 @@ export default function VotePage() {
           <span style={{ position:'absolute', bottom:8, left:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
           <span style={{ position:'absolute', bottom:8, right:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
 
-          <p className="text-xs mb-3" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
-            Prophétie de <span style={{ color: '#c8880c' }}>{prediction.creatorName}</span>
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
+              Prophétie de <span style={{ color: '#c8880c' }}>{prediction.creatorName}</span>
+            </p>
+            {prediction.isAnonymous && (
+              <span className="text-xs px-2.5 py-1 rounded-full flex items-center gap-1"
+                style={{ background: '#1a1208', border: '1px solid #c8880c', color: '#f5c842', fontFamily: '"Cinzel", serif', letterSpacing: '0.06em' }}>
+                ◉ Prophétie Aveugle
+              </span>
+            )}
+          </div>
           <h1 className="text-2xl font-extrabold leading-snug mb-2" style={{ fontFamily: '"Lora", serif', color: '#f0dfa8' }}>
             « {prediction.question} »
           </h1>
+          {prediction.isAnonymous && (
+            <p className="text-xs mb-3 italic" style={{ color: '#6b5010' }}>
+              Orakl garde le secret des votes jusqu'à la révélation.
+            </p>
+          )}
           {prediction.context && (
             <p className="text-sm italic mb-5" style={{ color: '#6b5010' }}>{prediction.context}</p>
           )}

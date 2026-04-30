@@ -55,6 +55,7 @@ export default function CreatePredictionPage() {
   const [revealDate, setRevealDate]     = useState('')
   const [allowBoosts, setAllowBoosts]   = useState(true)
   const [allowSabotage, setAllowSabotage] = useState(true)
+  const [isAnonymous, setIsAnonymous]   = useState(false)
   const [baseReward, setBaseReward]     = useState(100)
 
   const [isLoading, setIsLoading] = useState(false)
@@ -90,7 +91,7 @@ export default function CreatePredictionPage() {
         options:      filledOptions as never,
         voteDeadline: new Date(voteDeadline).toISOString(),
         revealDate:   revealDate ? new Date(revealDate).toISOString() : undefined,
-        allowBoosts, allowSabotage, baseReward,
+        allowBoosts, allowSabotage, isAnonymous, baseReward,
       })
       if (publish) {
         const published = await predictionService.publish(prediction.id)
@@ -387,6 +388,46 @@ export default function CreatePredictionPage() {
                   </label>
                 ))}
               </div>
+
+              {/* Prophétie Aveugle */}
+              <div
+                className="rounded px-4 py-3 cursor-pointer transition"
+                style={{
+                  background: isAnonymous ? '#1a1208' : '#0e0c08',
+                  border: `1px solid ${isAnonymous ? '#c8880c' : '#2a2218'}`,
+                  boxShadow: isAnonymous ? '0 0 16px #c8880c20' : 'none',
+                }}
+                onClick={() => setIsAnonymous(v => !v)}
+                onMouseEnter={e => !isAnonymous && ((e.currentTarget as HTMLElement).style.borderColor = '#6b5010')}
+                onMouseLeave={e => !isAnonymous && ((e.currentTarget as HTMLElement).style.borderColor = '#2a2218')}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span style={{ fontSize:'1.2rem', color: isAnonymous ? '#f5c842' : '#3a2d10' }}>◉</span>
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-2" style={{ color:'#f0dfa8', fontFamily:'"Cinzel", serif' }}>
+                        Prophétie Aveugle
+                        {isAnonymous && (
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:'#c8880c22', border:'1px solid #c8880c', color:'#f5c842', letterSpacing:'0.06em' }}>
+                            ACTIF
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color:'#6b5010' }}>
+                        Orakl garde le secret — les votes sont masqués pour tous jusqu'à la révélation
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isAnonymous}
+                    onChange={e => setIsAnonymous(e.target.checked)}
+                    onClick={e => e.stopPropagation()}
+                    className="w-4 h-4 cursor-pointer"
+                    style={{ accentColor: '#c8880c' }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -427,7 +468,7 @@ export default function CreatePredictionPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2 text-xs">
+              <div className="flex gap-2 text-xs flex-wrap">
                 {allowBoosts && (
                   <span className="px-3 py-1 rounded-full" style={{ background:'#0e0c08', border:'1px solid #3a2d10', color:'#6b5010' }}>
                     Boosts activés
@@ -436,6 +477,11 @@ export default function CreatePredictionPage() {
                 {allowSabotage && (
                   <span className="px-3 py-1 rounded-full" style={{ background:'#0e0c08', border:'1px solid #3a2d10', color:'#6b5010' }}>
                     Sabotages activés
+                  </span>
+                )}
+                {isAnonymous && (
+                  <span className="px-3 py-1 rounded-full flex items-center gap-1" style={{ background:'#1a1208', border:'1px solid #c8880c', color:'#f5c842', fontFamily:'"Cinzel", serif' }}>
+                    ◉ Prophétie Aveugle
                   </span>
                 )}
               </div>

@@ -65,6 +65,7 @@ public class PredictionsController : ControllerBase
             RevealDate     = req.RevealDate?.ToUniversalTime(),
             AllowBoosts    = req.AllowBoosts,
             AllowSabotage  = req.AllowSabotage,
+            IsAnonymous    = req.IsAnonymous,
             BaseReward     = Math.Clamp(req.BaseReward, 50, 1000),
             MaxParticipants = req.MaxParticipants,
         };
@@ -332,8 +333,14 @@ public class PredictionsController : ControllerBase
     private PredictionResponse MapToResponse(
         Prediction prediction, AppUser creator, MyVoteResponse? myVote)
     {
-        var isResolved = prediction.Status == PredictionStatus.Resolved;
-        var totalVotes = prediction.Votes.Count;
+        var isResolved  = prediction.Status == PredictionStatus.Resolved;
+        var isCreator   = prediction.CreatorId == CurrentUserId;
+        var totalVotes  = prediction.Votes.Count;
+
+        // Stats visibles si :
+        //   - pronostic résolu (tout le monde voit), ou
+        //   - pronostic non-anonyme ET l'utilisateur est le créateur (live preview)
+        var showStats = isResolved || (!prediction.IsAnonymous && isCreator);
 
         return new PredictionResponse
         {
@@ -351,6 +358,7 @@ public class PredictionsController : ControllerBase
             CorrectOptionId = prediction.CorrectOptionId,
             AllowBoosts     = prediction.AllowBoosts,
             AllowSabotage   = prediction.AllowSabotage,
+            IsAnonymous     = prediction.IsAnonymous,
             BaseReward      = prediction.BaseReward,
             MaxParticipants = prediction.MaxParticipants,
             ShareCode       = prediction.ShareCode,
@@ -360,7 +368,7 @@ public class PredictionsController : ControllerBase
             ResolvedAt      = prediction.ResolvedAt,
             ParticipantCount = totalVotes,
             MyVote          = myVote,
-            IsCreator       = prediction.CreatorId == CurrentUserId,
+            IsCreator       = isCreator,
             Options         = prediction.Options
                 .OrderBy(o => o.SortOrder)
                 .Select(o => new OptionResponse
@@ -370,9 +378,9 @@ public class PredictionsController : ControllerBase
                     Description = o.Description,
                     ImageUrl    = o.ImageUrl,
                     SortOrder   = o.SortOrder,
-                    // Afficher les stats uniquement après résolution
-                    VoteCount      = isResolved ? o.Votes.Count : null,
-                    VotePercentage = isResolved && totalVotes > 0
+                    // Stats visibles selon showStats
+                    VoteCount      = showStats ? o.Votes.Count : null,
+                    VotePercentage = showStats && totalVotes > 0
                         ? Math.Round((double)o.Votes.Count / totalVotes * 100, 1)
                         : null,
                 })

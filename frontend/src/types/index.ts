@@ -77,6 +77,7 @@ export interface Prediction {
   correctOptionId?: string
   allowBoosts: boolean
   allowSabotage: boolean
+  isAnonymous: boolean
   baseReward: number
   maxParticipants?: number
   shareCode: string

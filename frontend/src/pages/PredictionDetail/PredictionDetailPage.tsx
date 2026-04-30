@@ -135,6 +135,12 @@ export default function PredictionDetailPage() {
               {prediction.allowBoosts && (
                 <span className="px-3 py-1 rounded-full" style={{ background: '#0e0c08', border: '1px solid #2a2218' }}>Boosts actifs</span>
               )}
+              {prediction.isAnonymous && (
+                <span className="px-3 py-1 rounded-full flex items-center gap-1"
+                  style={{ background: '#1a1208', border: '1px solid #c8880c', color: '#f5c842', fontFamily: '"Cinzel", serif' }}>
+                  ◉ Prophétie Aveugle
+                </span>
+              )}
             </div>
 
             {hasVoted && !isResolved && (

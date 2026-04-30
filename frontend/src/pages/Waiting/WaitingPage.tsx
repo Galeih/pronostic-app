@@ -154,6 +154,14 @@ export default function WaitingPage() {
               <p className="text-xs mt-1" style={{ color: '#6b5010' }}>pts en jeu</p>
             </div>
           </div>
+          {prediction.isAnonymous && (
+            <div className="mt-4 pt-4 border-t text-center" style={{ borderColor: '#2a2218' }}>
+              <p className="text-xs flex items-center justify-center gap-1.5" style={{ color: '#c8880c', fontFamily: '"Cinzel", serif' }}>
+                <span>◉</span>
+                <span>Prophétie Aveugle — Orakl garde le secret des votes</span>
+              </p>
+            </div>
+          )}
         </div>
 
         {isCreator && votesClosed && (

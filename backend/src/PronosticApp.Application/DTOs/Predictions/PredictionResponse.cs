@@ -23,6 +23,10 @@ public class PredictionResponse
 
     public bool AllowBoosts { get; set; }
     public bool AllowSabotage { get; set; }
+
+    /// <summary>Prophétie Aveugle : stats masquées pour tout le monde jusqu'à la résolution.</summary>
+    public bool IsAnonymous { get; set; }
+
     public int BaseReward { get; set; }
     public int? MaxParticipants { get; set; }
 

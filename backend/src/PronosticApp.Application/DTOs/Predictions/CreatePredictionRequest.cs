@@ -31,6 +31,9 @@ public class CreatePredictionRequest
 
     public bool AllowSabotage { get; set; } = true;
 
+    /// <summary>Si vrai, les stats de vote sont masquées pour tout le monde jusqu'à la résolution (Prophétie Aveugle).</summary>
+    public bool IsAnonymous { get; set; } = false;
+
     /// <summary>Récompense de base en points fictifs (100 par défaut).</summary>
     public int BaseReward { get; set; } = 100;
 
