@@ -1,0 +1,23 @@
+# Secrets — ne jamais committer
+.env
+
+# SQLite dev
+*.db
+*.db-shm
+*.db-wal
+
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Node
+node_modules/
+frontend/dist/
+
+# Logs
+logs/
+*.log
+
+# VS
+.vs/

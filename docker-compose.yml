@@ -1,0 +1,50 @@
+services:
+
+  # ─── Base de données PostgreSQL ─────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pronosticapp
+      POSTGRES_USER: pronostic
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pronostic -d pronosticapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend ASP.NET Core ────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=pronosticapp;Username=pronostic;Password=${DB_PASSWORD}"
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: PronosticApp
+      Jwt__Audience: PronosticAppUsers
+      Jwt__ExpiryInDays: "7"
+      DbProvider: postgresql
+      Cors__AllowedOrigins: ${APP_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── Frontend React + Nginx ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
