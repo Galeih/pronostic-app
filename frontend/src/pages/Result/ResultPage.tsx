@@ -4,10 +4,13 @@ import { predictionService } from '../../services/predictionService'
 import { useAuth } from '../../context/AuthContext'
 import type { Prediction, PredictionOption } from '../../types'
 
+const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
+const cardStyle = { background: '#161209', border: '1px solid #6b5010', borderRadius: '6px' }
+
 export default function ResultPage() {
-  const { shareCode }  = useParams<{ shareCode: string }>()
-  const navigate       = useNavigate()
-  const { user }       = useAuth()
+  const { shareCode } = useParams<{ shareCode: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [prediction, setPrediction]           = useState<Prediction | null>(null)
   const [isLoading, setIsLoading]             = useState(true)
@@ -19,12 +22,10 @@ export default function ResultPage() {
 
   useEffect(() => {
     if (!shareCode) return
-    predictionService
-      .getByShareCode(shareCode)
+    predictionService.getByShareCode(shareCode)
       .then(p => {
         if (p.status !== 'Resolved' && user?.id !== p.creatorId) {
-          navigate(`/p/${shareCode}/waiting`, { replace: true })
-          return
+          navigate(`/p/${shareCode}/waiting`, { replace: true }); return
         }
         setPrediction(p)
       })
@@ -34,186 +35,186 @@ export default function ResultPage() {
 
   const handleResolve = async () => {
     if (!selectedCorrect || !prediction) return
-    setIsResolving(true)
-    setResolveError(null)
+    setIsResolving(true); setResolveError(null)
     try {
       const resolved = await predictionService.resolve(prediction.id, selectedCorrect.id)
       setPrediction(resolved)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })
-        ?.response?.data?.message ?? 'Erreur lors de la résolution.'
-      setResolveError(msg)
-    } finally {
-      setIsResolving(false)
-    }
+      setResolveError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur.')
+    } finally { setIsResolving(false) }
   }
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.origin + `/p/${shareCode}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (isLoading) return (
+    <div style={pageStyle} className="flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+    </div>
+  )
 
-  if (error || !prediction) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-4xl mb-4">🔍</p>
-          <p className="text-white text-xl font-bold mb-4">Pronostic introuvable</p>
-          <Link to="/" className="text-violet-400 hover:underline text-sm">Retour</Link>
-        </div>
+  if (error || !prediction) return (
+    <div style={pageStyle} className="flex items-center justify-center px-4">
+      <div className="text-center">
+        <p className="text-4xl mb-4" style={{ color: '#c8880c' }}>✦</p>
+        <p className="text-xl font-bold mb-4" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>Pronostic introuvable</p>
+        <Link to="/" style={{ color: '#c8880c' }}>Retour</Link>
       </div>
-    )
-  }
+    </div>
+  )
 
   const isCreator     = user?.id === prediction.creatorId
   const isResolved    = prediction.status === 'Resolved'
-  const sortedOptions = [...prediction.options].sort((a, b) =>
-    (b.votePercentage ?? 0) - (a.votePercentage ?? 0)
-  )
-  const myVoteOption  = prediction.myVote
-    ? prediction.options.find(o => o.id === prediction.myVote!.optionId)
-    : null
-  const iWon = prediction.myVote?.isCorrect === true
+  const sortedOptions = [...prediction.options].sort((a, b) => (b.votePercentage ?? 0) - (a.votePercentage ?? 0))
+  const myVoteOption  = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
+  const iWon          = prediction.myVote?.isCorrect === true
 
-  // Vue créateur : choisir la bonne réponse
-  if (isCreator && !isResolved) {
-    return (
-      <div className="min-h-screen bg-gray-950 text-white">
-        <div className="max-w-xl mx-auto px-4 py-10">
-          <div className="flex items-center gap-4 mb-8">
-            <Link to={`/p/${shareCode}/waiting`} className="text-gray-500 hover:text-gray-300 text-sm">
-              &larr; Retour
-            </Link>
-          </div>
-
-          <div className="text-center mb-8">
-            <div className="text-5xl mb-4">⚡</div>
-            <h1 className="text-2xl font-extrabold mb-1">Révèle les résultats</h1>
-            <p className="text-gray-400 text-sm">
-              Sélectionne la bonne réponse. Les points seront attribués automatiquement.
-            </p>
-          </div>
-
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 mb-6">
-            <p className="text-xs text-gray-500 mb-2">La question</p>
-            <p className="text-lg font-bold text-white">{prediction.question}</p>
-            {prediction.context && (
-              <p className="text-gray-400 text-sm italic mt-1">{prediction.context}</p>
-            )}
-            <p className="text-xs text-gray-600 mt-3">
-              👥 {prediction.participantCount} participant{(prediction.participantCount ?? 0) > 1 ? 's' : ''}
-            </p>
-          </div>
-
-          <div className="space-y-3 mb-6">
-            <p className="text-sm font-semibold text-gray-300">Quelle est la bonne réponse ?</p>
-            {sortedOptions.map(option => {
-              const isSelected = selectedCorrect?.id === option.id
-              return (
-                <button
-                  key={option.id}
-                  onClick={() => setSelectedCorrect(isSelected ? null : option)}
-                  className={`w-full text-left rounded-xl border px-4 py-3.5 transition-all ${
-                    isSelected
-                      ? 'bg-green-900/30 border-green-600 ring-2 ring-green-500/30 text-white'
-                      : 'bg-gray-800 border-gray-700 text-gray-200 hover:border-green-600/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      isSelected ? 'bg-green-500 border-green-500' : 'border-gray-600'
-                    }`}>
-                      {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                    </div>
-                    <span className="font-semibold text-sm">{option.label}</span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {resolveError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">
-              {resolveError}
-            </div>
-          )}
-
-          <button
-            onClick={handleResolve}
-            disabled={!selectedCorrect || isResolving}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-sm transition flex items-center justify-center gap-2"
-          >
-            {isResolving && (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            )}
-            {isResolving ? 'Révélation...' : selectedCorrect ? `Révéler : "${selectedCorrect.label}"` : 'Sélectionne la bonne réponse'}
-          </button>
+  // ── Vue créateur: choisir la bonne réponse ───────────────────
+  if (isCreator && !isResolved) return (
+    <div style={pageStyle}>
+      <div className="max-w-xl mx-auto px-4 py-10">
+        <div className="flex items-center gap-4 mb-8">
+          <Link to={`/p/${shareCode}/waiting`} className="text-sm transition"
+            style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#c8880c')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}>
+            ← Retour
+          </Link>
         </div>
-      </div>
-    )
-  }
 
-  // Vue résultats (tout le monde)
+        <div className="text-center mb-8">
+          <p className="text-5xl mb-4" style={{ color: '#f5c842' }}>⚖</p>
+          <h1 className="text-2xl font-extrabold mb-1" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
+            L'Oracle juge
+          </h1>
+          <p className="text-sm" style={{ color: '#6b5010' }}>
+            Sélectionne la bonne réponse. Les points seront distribués.
+          </p>
+        </div>
+
+        <div className="relative p-5 rounded mb-6" style={cardStyle}>
+          <span style={{ position:'absolute', top:6, left:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+          <span style={{ position:'absolute', top:6, right:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+          <p className="text-xs mb-2" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>La prophétie</p>
+          <p className="text-lg font-bold" style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+            « {prediction.question} »
+          </p>
+          {prediction.context && <p className="text-sm italic mt-1" style={{ color: '#6b5010' }}>{prediction.context}</p>}
+          <p className="text-xs mt-3" style={{ color: '#3a2d10' }}>👥 {prediction.participantCount} initiés</p>
+        </div>
+
+        <div className="space-y-3 mb-6">
+          <p className="text-sm font-semibold" style={{ fontFamily: '"Cinzel", serif', color: '#8a7a5a' }}>
+            Quelle est la vérité ?
+          </p>
+          {sortedOptions.map(option => {
+            const isSel = selectedCorrect?.id === option.id
+            return (
+              <button
+                key={option.id}
+                onClick={() => setSelectedCorrect(isSel ? null : option)}
+                className="w-full text-left rounded px-4 py-3.5 transition-all"
+                style={{
+                  background: isSel ? '#1a2810' : '#0e0c08',
+                  border: `1px solid ${isSel ? '#3a8a20' : '#3a2d10'}`,
+                  boxShadow: isSel ? '0 0 16px #3a8a2030' : 'none',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    style={{ borderColor: isSel ? '#5aaa30' : '#3a2d10', background: isSel ? '#5aaa30' : 'transparent' }}>
+                    {isSel && <div className="w-2 h-2 rounded-full" style={{ background: '#0e0c08' }} />}
+                  </div>
+                  <span className="font-semibold text-sm" style={{ color: isSel ? '#a0ff70' : '#f0dfa8', fontFamily: '"Cinzel", serif' }}>
+                    {option.label}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {resolveError && (
+          <div className="rounded px-4 py-3 text-sm mb-4" style={{ background: '#2a0c0c', border: '1px solid #6b2020', color: '#e05050' }}>
+            {resolveError}
+          </div>
+        )}
+
+        <button
+          onClick={handleResolve}
+          disabled={!selectedCorrect || isResolving}
+          className="w-full font-bold py-3.5 rounded text-sm transition flex items-center justify-center gap-2"
+          style={{
+            background: selectedCorrect ? 'linear-gradient(135deg, #2a6010, #3a8a20)' : '#2a2218',
+            color: selectedCorrect ? '#d0ffa0' : '#3a2d10',
+            fontFamily: '"Cinzel", serif', fontSize: '0.8rem',
+            border: `1px solid ${selectedCorrect ? '#5aaa30' : '#2a2218'}`,
+            cursor: selectedCorrect && !isResolving ? 'pointer' : 'not-allowed',
+            letterSpacing: '0.06em',
+          }}
+        >
+          {isResolving && <span className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }} />}
+          {isResolving ? 'Jugement en cours...' : selectedCorrect ? `⚖ Révéler : « ${selectedCorrect.label} »` : 'Sélectionne la vérité'}
+        </button>
+      </div>
+    </div>
+  )
+
+  // ── Vue résultats ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div style={pageStyle}>
       <div className="max-w-xl mx-auto px-4 py-10">
 
         <div className="flex items-center justify-between mb-6">
-          <Link to={`/p/${shareCode}`} className="text-gray-500 hover:text-gray-300 text-sm">
-            &larr; Pronostic
+          <Link to={`/p/${shareCode}`} className="text-sm transition"
+            style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#c8880c')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}>
+            ← Pronostic
           </Link>
-          <button
-            onClick={copyLink}
-            className="text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-4 py-2 rounded-lg transition"
-          >
-            {copied ? 'Copié !' : 'Partager'}
+          <button onClick={copyLink} className="text-sm px-4 py-2 rounded transition"
+            style={{ background: '#161209', border: '1px solid #6b5010', color: copied ? '#f5c842' : '#8a7a5a', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}>
+            {copied ? '✓ Copié !' : '◈ Partager'}
           </button>
         </div>
 
         {prediction.myVote && (
-          <div className={`rounded-2xl border p-6 text-center mb-6 ${
-            iWon ? 'bg-green-900/20 border-green-700/50' : 'bg-red-900/20 border-red-700/50'
-          }`}>
-            <div className="text-5xl mb-3">{iWon ? '🎉' : '😬'}</div>
-            <p className={`text-2xl font-extrabold mb-1 ${iWon ? 'text-green-300' : 'text-red-300'}`}>
-              {iWon ? 'Bien joué !' : 'Raté !'}
+          <div className="rounded p-6 text-center mb-6" style={{
+            background: iWon ? '#1a2810' : '#2a0c0c',
+            border: `1px solid ${iWon ? '#3a8a20' : '#6b2020'}`,
+            boxShadow: `0 0 30px ${iWon ? '#3a8a2030' : '#6b202030'}`,
+          }}>
+            <div className="text-5xl mb-3">{iWon ? '✦' : '✗'}</div>
+            <p className="text-2xl font-extrabold mb-1" style={{ fontFamily: '"Cinzel Decorative", serif', color: iWon ? '#a0ff70' : '#e05050' }}>
+              {iWon ? 'Prophétie accomplie !' : 'L\'Oracle a décidé autrement'}
             </p>
-            {iWon && (
-              <p className="text-green-400 text-lg font-bold">+{prediction.myVote.rewardPoints} pts</p>
-            )}
+            {iWon && <p className="font-bold text-lg" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>+{prediction.myVote.rewardPoints} pts</p>}
             {myVoteOption && (
-              <p className="text-gray-400 text-sm mt-2">
-                Tu avais voté pour : <span className="text-white font-medium">"{myVoteOption.label}"</span>
+              <p className="text-sm mt-2" style={{ color: '#6b5010' }}>
+                Tu avais choisi : <span style={{ color: '#f0dfa8', fontFamily: '"Cinzel", serif' }}>« {myVoteOption.label} »</span>
               </p>
             )}
           </div>
         )}
 
-        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 mb-5">
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-            Pronostic de <span className="text-violet-400">{prediction.creatorName}</span>
+        <div className="relative p-5 rounded mb-5" style={cardStyle}>
+          <span style={{ position:'absolute', top:6, left:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+          <span style={{ position:'absolute', top:6, right:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+          <p className="text-xs uppercase tracking-wide mb-2" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
+            Prophétie de <span style={{ color: '#c8880c' }}>{prediction.creatorName}</span>
           </p>
-          <h1 className="text-xl font-extrabold text-white">{prediction.question}</h1>
-          {prediction.context && (
-            <p className="text-gray-400 text-sm italic mt-1">{prediction.context}</p>
-          )}
+          <h1 className="text-xl font-extrabold" style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+            « {prediction.question} »
+          </h1>
+          {prediction.context && <p className="text-sm italic mt-1" style={{ color: '#6b5010' }}>{prediction.context}</p>}
         </div>
 
-        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 mb-5">
-          <p className="text-sm font-semibold text-gray-200 mb-4">
+        <div className="relative p-5 rounded mb-5" style={cardStyle}>
+          <p className="text-sm font-semibold mb-4" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>
             Répartition des votes{' '}
-            <span className="text-gray-500 font-normal">
-              ({prediction.participantCount} participant{(prediction.participantCount ?? 0) > 1 ? 's' : ''})
-            </span>
+            <span style={{ color: '#6b5010', fontWeight: 400 }}>({prediction.participantCount} initiés)</span>
           </p>
           <div className="space-y-4">
             {sortedOptions.map(option => {
@@ -224,27 +225,24 @@ export default function ResultPage() {
                 <div key={option.id}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
-                      {isCorrect && <span className="text-green-400 text-sm">✅</span>}
-                      {isMyVote && !isCorrect && <span className="text-red-400 text-sm">✗</span>}
-                      <span className={`text-sm font-semibold ${
-                        isCorrect ? 'text-green-300' : isMyVote ? 'text-gray-400' : 'text-gray-200'
-                      }`}>
+                      {isCorrect  && <span style={{ color: '#a0ff70' }}>✦</span>}
+                      {isMyVote && !isCorrect && <span style={{ color: '#e05050' }}>✗</span>}
+                      <span className="text-sm font-semibold" style={{
+                        color: isCorrect ? '#a0ff70' : isMyVote ? '#8a6060' : '#9a8a64',
+                        fontFamily: '"Cinzel", serif',
+                      }}>
                         {option.label}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className={`text-sm font-bold ${isCorrect ? 'text-green-400' : 'text-gray-500'}`}>
-                        {pct}%
-                      </span>
-                      <span className="text-xs text-gray-600 ml-1">({option.voteCount ?? 0})</span>
+                      <span className="text-sm font-bold" style={{ color: isCorrect ? '#a0ff70' : '#6b5010' }}>{pct}%</span>
+                      <span className="text-xs ml-1" style={{ color: '#3a2d10' }}>({option.voteCount ?? 0})</span>
                     </div>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: '#0e0c08' }}>
                     <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        isCorrect ? 'bg-green-500' : isMyVote ? 'bg-red-500/50' : 'bg-gray-600'
-                      }`}
-                      style={{ width: `${pct}%` }}
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${pct}%`, background: isCorrect ? 'linear-gradient(to right, #3a8a20, #a0ff70)' : isMyVote ? '#4a2020' : '#3a2d10' }}
                     />
                   </div>
                 </div>
@@ -254,30 +252,25 @@ export default function ResultPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 text-center">
-            <p className="text-2xl font-black text-violet-400">{prediction.baseReward}</p>
-            <p className="text-xs text-gray-500 mt-1">points distribués</p>
-          </div>
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 text-center">
-            <p className="text-2xl font-black text-violet-400">
-              {prediction.options.find(o => o.id === prediction.correctOptionId)?.voteCount ?? 0}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">gagnants</p>
-          </div>
+          {[
+            { label: 'pts distribués', val: prediction.baseReward },
+            { label: 'gagnants', val: prediction.options.find(o => o.id === prediction.correctOptionId)?.voteCount ?? 0 },
+          ].map(s => (
+            <div key={s.label} className="rounded p-4 text-center" style={cardStyle}>
+              <p className="text-2xl font-black" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{s.val}</p>
+              <p className="text-xs mt-1" style={{ color: '#6b5010' }}>{s.label}</p>
+            </div>
+          ))}
         </div>
 
         <div className="flex flex-col gap-3">
-          <Link
-            to="/create"
-            className="w-full text-center bg-violet-600 hover:bg-violet-500 text-white font-bold py-3.5 rounded-xl text-sm transition"
-          >
-            Créer un nouveau pronostic
+          <Link to="/create" className="w-full text-center font-bold py-3.5 rounded transition"
+            style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842', letterSpacing: '0.06em' }}>
+            ✦ Nouvelle prophétie
           </Link>
-          <Link
-            to="/"
-            className="w-full text-center bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 font-semibold py-3 rounded-xl text-sm transition"
-          >
-            Retour à l accueil
+          <Link to="/" className="w-full text-center font-semibold py-3 rounded transition"
+            style={{ background: '#161209', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}>
+            Retour à l'accueil
           </Link>
         </div>
       </div>

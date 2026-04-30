@@ -3,83 +3,89 @@ import { Link } from 'react-router-dom'
 import { userService, type HistoryItem } from '../../services/userService'
 import Navbar from '../../components/layout/Navbar'
 
+const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
+
 type Filter = 'all' | 'won' | 'lost' | 'pending' | 'created'
 
 const STATUS_LABELS: Record<string, string> = {
   Draft:              'Brouillon',
   Open:               'En cours',
-  VoteClosed:         'Votes fermes',
+  VoteClosed:         'Votes fermés',
   AwaitingResolution: 'En attente',
-  Resolved:           'Termine',
-  Archived:           'Archive',
-  Cancelled:          'Annule',
+  Resolved:           'Terminé',
+  Archived:           'Archivé',
+  Cancelled:          'Annulé',
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Draft:              'text-gray-500 bg-gray-800',
-  Open:               'text-green-400 bg-green-900/30',
-  VoteClosed:         'text-yellow-400 bg-yellow-900/30',
-  AwaitingResolution: 'text-orange-400 bg-orange-900/30',
-  Resolved:           'text-violet-400 bg-violet-900/30',
-  Archived:           'text-gray-500 bg-gray-800',
-  Cancelled:          'text-red-400 bg-red-900/30',
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  Draft:              { bg: '#0e0c08', color: '#3a2d10' },
+  Open:               { bg: '#0e1a0a', color: '#5aaa30' },
+  VoteClosed:         { bg: '#1a1408', color: '#c8880c' },
+  AwaitingResolution: { bg: '#1a1208', color: '#e6a817' },
+  Resolved:           { bg: '#1a1a08', color: '#f5c842' },
+  Archived:           { bg: '#0e0c08', color: '#2a2218' },
+  Cancelled:          { bg: '#1a0808', color: '#e05050' },
 }
 
 function HistoryCard({ item }: { item: HistoryItem }) {
   const isResolved = item.status === 'Resolved'
   const won  = item.myVote?.isCorrect === true
   const lost = item.myVote?.isCorrect === false
+  const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.Draft
 
   return (
     <Link
       to={`/p/${item.shareCode}${isResolved ? '/result' : ''}`}
-      className="block bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl p-4 transition group"
+      className="block p-4 rounded transition group"
+      style={{
+        background: '#161209',
+        border: '1px solid #3a2d10',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#6b5010')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#3a2d10')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white group-hover:text-violet-300 transition line-clamp-2 leading-snug">
-            {item.question}
+          <p className="text-sm font-semibold leading-snug line-clamp-2 transition"
+            style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+            « {item.question} »
           </p>
 
           {item.myVote?.optionLabel && (
-            <p className="text-xs text-gray-500 mt-1.5">
-              Mon vote :{' '}
-              <span className={`font-medium ${won ? 'text-green-400' : lost ? 'text-red-400' : 'text-gray-400'}`}>
+            <p className="text-xs mt-1.5" style={{ color: '#6b5010' }}>
+              Ton choix :{' '}
+              <span style={{ color: won ? '#a0ff70' : lost ? '#e05050' : '#c8880c', fontFamily: '"Cinzel", serif' }}>
                 {item.myVote.optionLabel}
               </span>
             </p>
           )}
 
           <div className="flex items-center gap-3 mt-2 flex-wrap">
-            <span className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${STATUS_COLORS[item.status] ?? ''}`}>
+            <span className="text-xs font-medium rounded-full px-2.5 py-0.5"
+              style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.color}44`, fontFamily: '"Cinzel", serif', fontSize: '0.65rem', letterSpacing: '0.06em' }}>
               {STATUS_LABELS[item.status] ?? item.status}
             </span>
             {item.isCreator && (
-              <span className="text-xs text-violet-400 bg-violet-900/20 rounded-full px-2.5 py-0.5">
-                Createur
+              <span className="text-xs rounded-full px-2.5 py-0.5"
+                style={{ background: '#1e1810', border: '1px solid #c8880c44', color: '#c8880c', fontFamily: '"Cinzel", serif', fontSize: '0.65rem' }}>
+                Créateur
               </span>
             )}
-            <span className="text-xs text-gray-600">
-              {item.participantCount} participants
-            </span>
-            <span className="text-xs text-gray-600">
-              {new Date(item.createdAt).toLocaleDateString('fr-FR')}
-            </span>
+            <span className="text-xs" style={{ color: '#3a2d10' }}>{item.participantCount} initiés</span>
+            <span className="text-xs" style={{ color: '#2a2218' }}>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</span>
           </div>
         </div>
 
         <div className="flex-shrink-0 text-right">
           {isResolved && item.myVote && (
-            <div className={`text-lg font-black ${won ? 'text-green-400' : 'text-red-400'}`}>
-              {won ? `+${item.myVote.rewardPoints}` : 'X'}
-            </div>
+            <>
+              <div className="text-lg font-black" style={{ color: won ? '#a0ff70' : '#e05050', fontFamily: '"Cinzel", serif' }}>
+                {won ? `+${item.myVote.rewardPoints}` : '✗'}
+              </div>
+              <p className="text-xs" style={{ color: '#3a2d10' }}>{won ? 'pts' : 'raté'}</p>
+            </>
           )}
-          {isResolved && item.myVote && (
-            <p className="text-xs text-gray-600">{won ? 'pts' : 'rate'}</p>
-          )}
-          {!isResolved && (
-            <span className="text-gray-600 text-xs">-</span>
-          )}
+          {!isResolved && <span className="text-xs" style={{ color: '#2a2218' }}>—</span>}
         </div>
       </div>
     </Link>
@@ -97,14 +103,9 @@ export default function HistoryPage() {
   const PAGE_SIZE = 20
 
   useEffect(() => {
-    setIsLoading(true)
-    setItems([])
-    setPage(1)
+    setIsLoading(true); setItems([]); setPage(1)
     userService.getMyHistory(1, PAGE_SIZE)
-      .then(res => {
-        setItems(res.items)
-        setTotal(res.total)
-      })
+      .then(res => { setItems(res.items); setTotal(res.total) })
       .finally(() => setIsLoading(false))
   }, [])
 
@@ -128,40 +129,50 @@ export default function HistoryPage() {
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'all',     label: 'Tout' },
-    { key: 'won',     label: 'Gagnes' },
-    { key: 'lost',    label: 'Perdus' },
-    { key: 'pending', label: 'En cours' },
-    { key: 'created', label: 'Crees' },
+    { key: 'won',     label: '✦ Gagnés' },
+    { key: 'lost',    label: '✗ Perdus' },
+    { key: 'pending', label: '⏳ En cours' },
+    { key: 'created', label: '◈ Créés' },
   ]
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div style={pageStyle}>
       <Navbar />
       <div className="max-w-2xl mx-auto px-4 py-10">
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-extrabold">Historique</h1>
-            <p className="text-gray-500 text-sm mt-0.5">{total} pronostic{total > 1 ? 's' : ''} au total</p>
+            <h1 className="text-2xl font-extrabold" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
+              Archives
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+              {total} prophétie{total > 1 ? 's' : ''} au total
+            </p>
           </div>
           <Link
             to="/create"
-            className="bg-violet-600 hover:bg-violet-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition"
+            className="font-semibold text-sm px-4 py-2 rounded transition"
+            style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', border: '1px solid #f5c842', letterSpacing: '0.06em' }}
           >
-            + Creer
+            ✦ Invoquer
           </Link>
         </div>
 
+        {/* Filters */}
         <div className="flex gap-2 flex-wrap mb-6">
           {FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition border ${
-                filter === f.key
-                  ? 'bg-violet-600 border-violet-500 text-white'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
-              }`}
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition"
+              style={{
+                background: filter === f.key ? '#1e1810' : '#0e0c08',
+                border: `1px solid ${filter === f.key ? '#c8880c' : '#3a2d10'}`,
+                color: filter === f.key ? '#f5c842' : '#6b5010',
+                fontFamily: '"Cinzel", serif',
+                fontSize: '0.7rem',
+                letterSpacing: '0.04em',
+              }}
             >
               {f.label}
             </button>
@@ -170,44 +181,50 @@ export default function HistoryPage() {
 
         {isLoading ? (
           <div className="flex items-center justify-center h-40">
-            <div className="w-7 h-7 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-4xl mb-3">📋</p>
-            <p className="text-gray-400 font-semibold mb-1">Aucun pronostic trouve</p>
-            <p className="text-gray-600 text-sm mb-5">
+            <p className="text-4xl mb-3" style={{ color: '#3a2d10' }}>◈</p>
+            <p className="font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#6b5010' }}>
+              Aucune prophétie trouvée
+            </p>
+            <p className="text-sm mb-5" style={{ color: '#3a2d10' }}>
               {filter === 'all'
-                ? "Tu n'as pas encore participe a des pronostics."
-                : 'Aucun pronostic ne correspond a ce filtre.'}
+                ? "Tu n'as pas encore participé à des pronostics."
+                : 'Aucune ne correspond à ce filtre.'}
             </p>
             {filter === 'all' && (
               <Link
                 to="/create"
-                className="inline-block bg-violet-600 hover:bg-violet-500 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition"
+                className="inline-block font-semibold px-6 py-2.5 rounded text-sm transition"
+                style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', border: '1px solid #f5c842' }}
               >
-                Creer mon premier pronostic
+                Invoquer ma première prophétie
               </Link>
             )}
           </div>
         ) : (
           <>
             <div className="space-y-3">
-              {filtered.map(item => (
-                <HistoryCard key={item.id} item={item} />
-              ))}
+              {filtered.map(item => <HistoryCard key={item.id} item={item} />)}
             </div>
 
             {items.length < total && filter === 'all' && (
               <button
                 onClick={loadMore}
                 disabled={isLoadingMore}
-                className="w-full mt-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 text-sm rounded-xl transition flex items-center justify-center gap-2"
+                className="w-full mt-6 py-3 rounded text-sm transition flex items-center justify-center gap-2"
+                style={{ background: '#161209', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#6b5010'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}
               >
                 {isLoadingMore && (
-                  <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: '#6b5010', borderTopColor: 'transparent' }} />
                 )}
-                {isLoadingMore ? 'Chargement...' : `Charger plus (${total - items.length} restants)`}
+                {isLoadingMore ? 'Consultation des archives...' : `Charger la suite (${total - items.length} restantes)`}
               </button>
             )}
           </>

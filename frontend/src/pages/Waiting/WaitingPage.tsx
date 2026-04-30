@@ -5,29 +5,23 @@ import { useAuth } from '../../context/AuthContext'
 import type { Prediction } from '../../types'
 
 function useCountdown(targetDate: string | undefined) {
-  const calc = () =>
-    targetDate ? Math.max(0, new Date(targetDate).getTime() - Date.now()) : null
+  const calc = () => targetDate ? Math.max(0, new Date(targetDate).getTime() - Date.now()) : null
   const [ms, setMs] = useState<number | null>(calc)
-  useEffect(() => {
-    const id = setInterval(() => setMs(calc()), 1000)
-    return () => clearInterval(id)
-  })
+  useEffect(() => { const id = setInterval(() => setMs(calc()), 1000); return () => clearInterval(id) })
   if (ms === null) return { label: null, expired: false }
   if (ms === 0)    return { label: null, expired: true }
-  const s = Math.floor(ms / 1000)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  const label = h > 0
-    ? `${h}h ${m.toString().padStart(2, '0')}m ${sec.toString().padStart(2, '0')}s`
-    : m > 0 ? `${m}m ${sec.toString().padStart(2, '0')}s` : `${sec}s`
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+  const label = h > 0 ? `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`
+    : m > 0 ? `${m}m ${String(sec).padStart(2,'0')}s` : `${sec}s`
   return { label, expired: false }
 }
 
+const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
+
 export default function WaitingPage() {
-  const { shareCode }       = useParams<{ shareCode: string }>()
-  const navigate            = useNavigate()
-  const { user }            = useAuth()
+  const { shareCode } = useParams<{ shareCode: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const [prediction, setPrediction] = useState<Prediction | null>(null)
   const [isLoading, setIsLoading]   = useState(true)
   const [error, setError]           = useState<string | null>(null)
@@ -38,20 +32,11 @@ export default function WaitingPage() {
     if (!shareCode) return
     try {
       const p = await predictionService.getByShareCode(shareCode)
-      if (p.status === 'Resolved') {
-        navigate(`/p/${shareCode}/result`, { replace: true })
-        return
-      }
-      if (p.status === 'Open' && !p.myVote) {
-        navigate(`/p/${shareCode}/vote`, { replace: true })
-        return
-      }
+      if (p.status === 'Resolved') { navigate(`/p/${shareCode}/result`, { replace: true }); return }
+      if (p.status === 'Open' && !p.myVote) { navigate(`/p/${shareCode}/vote`, { replace: true }); return }
       setPrediction(p)
-    } catch {
-      setError('Pronostic introuvable.')
-    } finally {
-      setIsLoading(false)
-    }
+    } catch { setError('Pronostic introuvable.') }
+    finally { setIsLoading(false) }
   }, [shareCode, navigate])
 
   useEffect(() => { load() }, [load])
@@ -61,132 +46,126 @@ export default function WaitingPage() {
       if (!shareCode) return
       try {
         const p = await predictionService.getByShareCode(shareCode)
-        if (p.status === 'Resolved') {
-          navigate(`/p/${shareCode}/result`, { replace: true })
-        } else {
-          setPrediction(p)
-        }
+        if (p.status === 'Resolved') navigate(`/p/${shareCode}/result`, { replace: true })
+        else setPrediction(p)
       } catch { /* silencieux */ }
     }, 15_000)
     return () => clearInterval(id)
   }, [shareCode, navigate])
 
-  useEffect(() => {
-    if (revealCountdown.expired && prediction?.status === 'Resolved') {
-      navigate(`/p/${shareCode}/result`, { replace: true })
-    }
-  }, [revealCountdown.expired, prediction, shareCode, navigate])
-
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.origin + `/p/${shareCode}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+  if (isLoading) return (
+    <div style={pageStyle} className="flex items-center justify-center">
+      <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  if (error || !prediction) return (
+    <div style={pageStyle} className="flex items-center justify-center px-4">
+      <div className="text-center">
+        <p className="text-4xl mb-4" style={{ color: '#c8880c' }}>✦</p>
+        <p className="text-xl font-bold mb-4" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>{error ?? 'Introuvable.'}</p>
+        <Link to="/" style={{ color: '#c8880c' }}>Retour</Link>
       </div>
-    )
-  }
+    </div>
+  )
 
-  if (error || !prediction) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-4xl mb-4">🔍</p>
-          <p className="text-white text-xl font-bold mb-4">{error ?? 'Pronostic introuvable.'}</p>
-          <Link to="/" className="text-violet-400 hover:underline text-sm">Retour</Link>
-        </div>
-      </div>
-    )
-  }
-
-  const myVoteOption = prediction.myVote
-    ? prediction.options.find(o => o.id === prediction.myVote!.optionId)
-    : null
+  const myVoteOption = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
   const isCreator   = user?.id === prediction.creatorId
   const votesOpen   = prediction.status === 'Open'
   const votesClosed = prediction.status === 'VoteClosed' || prediction.status === 'AwaitingResolution'
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div style={pageStyle} className="flex flex-col">
       <div className="max-w-xl mx-auto px-4 py-10 flex-1 w-full">
 
         <div className="flex items-center justify-between mb-8">
-          <Link to={`/p/${shareCode}`} className="text-gray-500 hover:text-gray-300 text-sm">
-            &larr; Pronostic
+          <Link to={`/p/${shareCode}`} className="text-sm transition" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#c8880c')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}>
+            ← Pronostic
           </Link>
           <button
             onClick={copyLink}
-            className="text-sm bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-4 py-2 rounded-lg transition"
+            className="text-sm px-4 py-2 rounded transition"
+            style={{ background: '#161209', border: '1px solid #6b5010', color: copied ? '#f5c842' : '#8a7a5a', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}
           >
-            {copied ? 'Copié !' : 'Partager'}
+            {copied ? '✓ Copié !' : '◈ Partager'}
           </button>
         </div>
 
         <div className="text-center mb-10">
           {votesOpen && (
             <>
-              <div className="text-6xl mb-4">⏳</div>
-              <h1 className="text-2xl font-extrabold mb-2">Votes en cours</h1>
-              <p className="text-gray-400 text-sm">D autres peuvent encore voter.</p>
+              <p className="text-5xl mb-4" style={{ color: '#c8880c' }}>⏳</p>
+              <h1 className="text-2xl font-extrabold mb-2" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
+                Votes en cours
+              </h1>
+              <p className="text-sm" style={{ color: '#6b5010' }}>D'autres initiés peuvent encore voter.</p>
             </>
           )}
           {votesClosed && (
             <>
-              <div className="text-6xl mb-4 animate-pulse">🔮</div>
-              <h1 className="text-2xl font-extrabold mb-2">Votes fermés !</h1>
+              <p className="text-5xl mb-4" style={{ animation: 'pulse 2s infinite', color: '#c8880c' }}>🔮</p>
+              <h1 className="text-2xl font-extrabold mb-2" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
+                Votes scellés !
+              </h1>
               {revealCountdown.label ? (
                 <>
-                  <p className="text-gray-400 text-sm mb-3">Révélation dans</p>
-                  <div className="inline-block bg-violet-900/30 border border-violet-700 rounded-2xl px-8 py-4">
-                    <p className="text-4xl font-mono font-black text-violet-300 tracking-widest">
+                  <p className="text-sm mb-3" style={{ color: '#6b5010' }}>Révélation dans</p>
+                  <div className="inline-block rounded px-8 py-4" style={{ background: '#161209', border: '1px solid #c8880c', boxShadow: '0 0 30px #c8880c30' }}>
+                    <p className="text-4xl font-mono font-black tracking-widest" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>
                       {revealCountdown.label}
                     </p>
                   </div>
                 </>
               ) : (
-                <p className="text-gray-400 text-sm">En attente de la résolution...</p>
+                <p className="text-sm" style={{ color: '#6b5010' }}>En attente de la résolution par l'Oracle...</p>
               )}
             </>
           )}
         </div>
 
         {myVoteOption && (
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 mb-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Ton pronostic</p>
-            <p className="text-lg font-bold text-white mb-1">{prediction.question}</p>
-            <div className="mt-3 bg-violet-900/20 border border-violet-700/40 rounded-xl px-4 py-3 flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
-              <p className="text-violet-200 font-semibold">{myVoteOption.label}</p>
+          <div className="relative p-5 rounded mb-5" style={{ background: '#161209', border: '1px solid #6b5010' }}>
+            <span style={{ position:'absolute', top:6, left:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+            <span style={{ position:'absolute', top:6, right:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
+            <p className="text-xs uppercase tracking-wide mb-2" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>Ta prophétie</p>
+            <p className="text-lg font-bold mb-1" style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>« {prediction.question} »</p>
+            <div className="mt-3 rounded px-4 py-3 flex items-center gap-3" style={{ background: '#1e1810', border: '1px solid #c8880c' }}>
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#c8880c' }} />
+              <p className="font-semibold" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{myVoteOption.label}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 mb-5">
+        <div className="relative p-5 rounded mb-5" style={{ background: '#161209', border: '1px solid #6b5010' }}>
           <div className="grid grid-cols-2 gap-4 text-center">
             <div>
-              <p className="text-3xl font-black text-violet-400">{prediction.participantCount}</p>
-              <p className="text-xs text-gray-500 mt-1">participants</p>
+              <p className="text-3xl font-black" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{prediction.participantCount}</p>
+              <p className="text-xs mt-1" style={{ color: '#6b5010' }}>initiés</p>
             </div>
             <div>
-              <p className="text-3xl font-black text-violet-400">{prediction.baseReward}</p>
-              <p className="text-xs text-gray-500 mt-1">points en jeu</p>
+              <p className="text-3xl font-black" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{prediction.baseReward}</p>
+              <p className="text-xs mt-1" style={{ color: '#6b5010' }}>pts en jeu</p>
             </div>
           </div>
         </div>
 
         {isCreator && votesClosed && (
-          <div className="bg-orange-900/20 border border-orange-700/40 rounded-2xl p-5 text-center">
-            <p className="text-orange-300 font-semibold mb-1">C est toi le créateur !</p>
-            <p className="text-gray-400 text-sm mb-4">Révèle maintenant les résultats.</p>
+          <div className="rounded p-5 text-center" style={{ background: '#1a1208', border: '1px solid #c8880c', boxShadow: '0 0 20px #c8880c20' }}>
+            <p className="font-semibold mb-1" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>Tu es l'Oracle !</p>
+            <p className="text-sm mb-4" style={{ color: '#6b5010' }}>Révèle la vérité à ton cercle.</p>
             <button
               onClick={() => navigate(`/p/${shareCode}/result`)}
-              className="bg-orange-500 hover:bg-orange-400 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
+              className="font-bold px-6 py-3 rounded transition"
+              style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842' }}
             >
-              Révéler les résultats
+              ✦ Révéler les résultats
             </button>
           </div>
         )}
@@ -195,15 +174,16 @@ export default function WaitingPage() {
           <div className="text-center">
             <button
               onClick={() => navigate(`/p/${shareCode}/vote`)}
-              className="bg-violet-600 hover:bg-violet-500 text-white font-bold px-8 py-3 rounded-xl text-sm transition"
+              className="font-bold px-8 py-3 rounded transition"
+              style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842' }}
             >
-              Voter maintenant
+              ✦ Voter maintenant
             </button>
           </div>
         )}
 
         {votesClosed && !isCreator && (
-          <p className="text-center text-xs text-gray-600 mt-4">
+          <p className="text-center text-xs mt-4" style={{ color: '#2a2218' }}>
             La page se met à jour automatiquement toutes les 15 secondes.
           </p>
         )}
