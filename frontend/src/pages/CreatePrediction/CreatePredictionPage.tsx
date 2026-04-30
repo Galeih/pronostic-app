@@ -12,7 +12,7 @@ interface OptionDraft {
 type Step = 'question' | 'options' | 'settings' | 'review'
 const STEPS: Step[] = ['question', 'options', 'settings', 'review']
 const STEP_LABELS: Record<Step, string> = {
-  question: 'Oracle',
+  question: 'Orakl',
   options:  'Choix',
   settings: 'Rites',
   review:   'Sceau',

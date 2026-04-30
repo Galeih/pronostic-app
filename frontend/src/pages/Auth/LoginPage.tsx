@@ -69,7 +69,7 @@ export default function LoginPage() {
             Play-Orakl
           </Link>
           <p className="mt-2 text-sm" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
-            Les astres vous attendaient.
+            Orakl vous attendait.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function LoginPage() {
             className="text-xl font-bold mb-6"
             style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8', textAlign: 'center' }}
           >
-            ✦ Entrer dans le Cercle ✦
+            ✦ Orakl vous reconnaît ✦
           </h2>
 
           {/* Gold divider */}
@@ -154,7 +154,7 @@ export default function LoginPage() {
                   style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }}
                 />
               )}
-              {isLoading ? 'Consultation des astres...' : '✦ Se connecter'}
+              {isLoading ? 'Orakl vérifie...' : '✦ Se connecter'}
             </button>
           </form>
 

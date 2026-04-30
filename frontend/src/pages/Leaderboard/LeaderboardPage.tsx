@@ -70,10 +70,10 @@ export default function LeaderboardPage() {
 
         <div className="text-center mb-10">
           <h1 className="text-3xl font-extrabold mb-1" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
-            L'Ordre des Oracles
+            L'Ordre d'Orakl
           </h1>
           <p className="text-sm" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
-            Les voyants les plus précis du Cercle
+            Bénis d'Orakl. Maudits de leurs amis.
           </p>
           {myRank !== undefined && myRank > 3 && (
             <div className="mt-3 inline-block rounded-full px-4 py-1.5 text-xs font-semibold"
@@ -115,7 +115,7 @@ export default function LeaderboardPage() {
                   <thead>
                     <tr className="border-b text-xs uppercase tracking-wide" style={{ borderColor: '#3a2d10', color: '#6b5010' }}>
                       <th className="text-left px-4 py-3 w-10" style={{ fontFamily: '"Cinzel", serif' }}>#</th>
-                      <th className="text-left px-4 py-3" style={{ fontFamily: '"Cinzel", serif' }}>Oracle</th>
+                      <th className="text-left px-4 py-3" style={{ fontFamily: '"Cinzel", serif' }}>Initié</th>
                       <th className="text-right px-4 py-3" style={{ fontFamily: '"Cinzel", serif' }}>Points</th>
                       <th className="text-right px-4 py-3 hidden sm:table-cell" style={{ fontFamily: '"Cinzel", serif' }}>Victoires</th>
                       <th className="text-right px-4 py-3 hidden sm:table-cell" style={{ fontFamily: '"Cinzel", serif' }}>Win %</th>
@@ -167,8 +167,8 @@ export default function LeaderboardPage() {
             {entries.length === 0 && (
               <div className="text-center py-16">
                 <p className="text-4xl mb-3" style={{ color: '#c8880c' }}>⚖</p>
-                <p className="font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>Aucun oracle pour l'instant</p>
-                <p className="text-sm" style={{ color: '#6b5010' }}>Sois le premier !</p>
+                <p className="font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>Orakl observe le vide</p>
+                <p className="text-sm" style={{ color: '#6b5010' }}>Sois le premier à mériter son regard.</p>
               </div>
             )}
           </>

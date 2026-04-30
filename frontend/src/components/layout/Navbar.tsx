@@ -50,7 +50,7 @@ export default function Navbar() {
                 Archives
               </Link>
               <Link to="/leaderboard" className={`transition ${isActive('/leaderboard')}`}>
-                Oracle
+                Orakl
               </Link>
             </>
           )}

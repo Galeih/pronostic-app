@@ -135,7 +135,7 @@ export default function VotePage() {
           <div style={{ height:'1px', background:'linear-gradient(to right, transparent, #6b5010, transparent)', margin:'20px 0' }} />
 
           <p className="text-sm font-semibold mb-3" style={{ fontFamily: '"Cinzel", serif', color: '#8a7a5a' }}>
-            Choisis ton destin
+            Soumets-toi au jugement d'Orakl
           </p>
           <div className="space-y-3">
             {sortedOptions.map(option => {
@@ -200,7 +200,7 @@ export default function VotePage() {
               }}
             >
               {isSubmitting && <span className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }} />}
-              {isSubmitting ? 'Consultation des astres...' : selected ? `✦ Voter pour « ${selected.label} »` : 'Sélectionne un destin'}
+              {isSubmitting ? 'Orakl enregistre ton choix...' : selected ? `✦ Voter pour « ${selected.label} »` : 'Soumets-toi au jugement'}
             </button>
           </div>
         </div>

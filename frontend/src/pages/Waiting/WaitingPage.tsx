@@ -105,7 +105,7 @@ export default function WaitingPage() {
               <h1 className="text-2xl font-extrabold mb-2" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
                 Votes en cours
               </h1>
-              <p className="text-sm" style={{ color: '#6b5010' }}>D'autres initiés peuvent encore voter.</p>
+              <p className="text-sm" style={{ color: '#6b5010' }}>Orakl attend que ses fidèles se prononcent.</p>
             </>
           )}
           {votesClosed && (
@@ -124,7 +124,7 @@ export default function WaitingPage() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm" style={{ color: '#6b5010' }}>En attente de la résolution par l'Oracle...</p>
+                <p className="text-sm" style={{ color: '#6b5010' }}>Orakl délibère. Personne ne sait combien de temps ça prendra.</p>
               )}
             </>
           )}
@@ -158,14 +158,14 @@ export default function WaitingPage() {
 
         {isCreator && votesClosed && (
           <div className="rounded p-5 text-center" style={{ background: '#1a1208', border: '1px solid #c8880c', boxShadow: '0 0 20px #c8880c20' }}>
-            <p className="font-semibold mb-1" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>Tu es l'Oracle !</p>
-            <p className="text-sm mb-4" style={{ color: '#6b5010' }}>Révèle la vérité à ton cercle.</p>
+            <p className="font-semibold mb-1" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>Tu es la Main d'Orakl.</p>
+            <p className="text-sm mb-4" style={{ color: '#6b5010' }}>Transmets son verdict. Nul ne peut le contester.</p>
             <button
               onClick={() => navigate(`/p/${shareCode}/result`)}
               className="font-bold px-6 py-3 rounded transition"
               style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842' }}
             >
-              ✦ Révéler les résultats
+              ✦ Parler au nom d'Orakl
             </button>
           </div>
         )}

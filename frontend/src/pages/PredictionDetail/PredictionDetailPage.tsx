@@ -199,7 +199,7 @@ export default function PredictionDetailPage() {
                 style={{ background: prediction.myVote.isCorrect ? '#1a2810' : '#2a0c0c', border: `1px solid ${prediction.myVote.isCorrect ? '#3a8a20' : '#6b2020'}` }}>
                 <p className="text-2xl mb-1">{prediction.myVote.isCorrect ? '✦' : '✗'}</p>
                 <p className="font-bold" style={{ color: prediction.myVote.isCorrect ? '#a0ff70' : '#e05050', fontFamily: '"Cinzel", serif' }}>
-                  {prediction.myVote.isCorrect ? `Prophétie accomplie ! +${prediction.myVote.rewardPoints} pts` : 'L\'Oracle a décidé autrement...'}
+                  {prediction.myVote.isCorrect ? `Prophétie accomplie ! +${prediction.myVote.rewardPoints} pts` : 'Orakl en a décidé autrement...'}
                 </p>
               </div>
             )}

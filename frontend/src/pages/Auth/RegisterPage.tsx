@@ -73,7 +73,7 @@ export default function RegisterPage() {
             Play-Orakl
           </Link>
           <p className="mt-2 text-sm" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
-            Votre destin commence ici.
+            Orakl a déjà tout prévu.
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function RegisterPage() {
             className="text-xl font-bold mb-6"
             style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8', textAlign: 'center' }}
           >
-            ✦ Initiation au Cercle ✦
+            ✦ Orakl vous accepte ✦
           </h2>
 
           <div style={{ height:'1px', background:'linear-gradient(to right, transparent, #6b5010, transparent)', marginBottom:'24px' }} />
@@ -187,7 +187,7 @@ export default function RegisterPage() {
                 <span className="w-4 h-4 rounded-full border-2 animate-spin"
                   style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }} />
               )}
-              {isLoading ? 'Inscription aux étoiles...' : '✦ Rejoindre le Cercle'}
+              {isLoading ? 'Orakl inscrit ton nom...' : '✦ Rejoindre le Cercle'}
             </button>
           </form>
 

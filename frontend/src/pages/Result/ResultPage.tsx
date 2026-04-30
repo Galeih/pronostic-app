@@ -87,10 +87,10 @@ export default function ResultPage() {
         <div className="text-center mb-8">
           <p className="text-5xl mb-4" style={{ color: '#f5c842' }}>⚖</p>
           <h1 className="text-2xl font-extrabold mb-1" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
-            L'Oracle juge
+            Orakl te juge
           </h1>
           <p className="text-sm" style={{ color: '#6b5010' }}>
-            Sélectionne la bonne réponse. Les points seront distribués.
+            Transmets le verdict d'Orakl. Ses serviteurs recevront leurs points.
           </p>
         </div>
 
@@ -156,7 +156,7 @@ export default function ResultPage() {
           }}
         >
           {isResolving && <span className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }} />}
-          {isResolving ? 'Jugement en cours...' : selectedCorrect ? `⚖ Révéler : « ${selectedCorrect.label} »` : 'Sélectionne la vérité'}
+          {isResolving ? 'Orakl délibère...' : selectedCorrect ? `⚖ Révéler : « ${selectedCorrect.label} »` : 'Révèle la volonté d\'Orakl'}
         </button>
       </div>
     </div>
@@ -188,7 +188,7 @@ export default function ResultPage() {
           }}>
             <div className="text-5xl mb-3">{iWon ? '✦' : '✗'}</div>
             <p className="text-2xl font-extrabold mb-1" style={{ fontFamily: '"Cinzel Decorative", serif', color: iWon ? '#a0ff70' : '#e05050' }}>
-              {iWon ? 'Prophétie accomplie !' : 'L\'Oracle a décidé autrement'}
+              {iWon ? 'Prophétie accomplie !' : 'Orakl en a décidé autrement'}
             </p>
             {iWon && <p className="font-bold text-lg" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>+{prediction.myVote.rewardPoints} pts</p>}
             {myVoteOption && (
@@ -266,7 +266,7 @@ export default function ResultPage() {
         <div className="flex flex-col gap-3">
           <Link to="/create" className="w-full text-center font-bold py-3.5 rounded transition"
             style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842', letterSpacing: '0.06em' }}>
-            ✦ Nouvelle prophétie
+            ✦ Invoquer à nouveau
           </Link>
           <Link to="/" className="w-full text-center font-semibold py-3 rounded transition"
             style={{ background: '#161209', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}>

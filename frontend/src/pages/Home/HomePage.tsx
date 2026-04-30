@@ -86,7 +86,7 @@ export default function HomePage() {
             className="text-5xl sm:text-6xl font-black tracking-tight mb-6 leading-tight"
             style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f0dfa8' }}
           >
-            L'Oracle{' '}
+            Orakl{' '}
             <span style={{
               background: 'linear-gradient(135deg, #f5c842, #c8880c)',
               WebkitBackgroundClip: 'text',
@@ -204,10 +204,10 @@ export default function HomePage() {
           className="text-2xl font-extrabold text-center mb-3"
           style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}
         >
-          L'Oracle révèle tout
+          Orakl révèle tout
         </h2>
         <p className="text-sm text-center mb-10" style={{ color: '#6b5010' }}>
-          N'importe quelle question peut devenir un rite collectif.
+          Soumets n'importe quelle question au jugement suprême.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -305,7 +305,7 @@ export default function HomePage() {
           {[
             { step: 'I',   icon: '✦', title: 'Révèle',  desc: 'Formule une question. Ajoute tes options. Fixe l\'heure du jugement.' },
             { step: 'II',  icon: '◈', title: 'Convoque', desc: 'Envoie le lien de l\'invocation à tes amis. Ils rejoignent en un clic.' },
-            { step: 'III', icon: '⚖', title: 'Juge',     desc: 'Révèle la vérité. Les points tombent. Les débats commencent.' },
+            { step: 'III', icon: '⚖', title: 'Juge',     desc: 'Orakl te juge. Les points tombent. Tes amis t'en voudront peut-être.' },
           ].map(s => (
             <div key={s.step} className="flex flex-col items-center">
               <div
@@ -336,10 +336,10 @@ export default function HomePage() {
             className="text-3xl font-black mb-3"
             style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}
           >
-            Le destin attend.
+            Orakl attend.
           </p>
           <p className="text-sm mb-6" style={{ color: '#6b5010' }}>
-            Gratuit, sans publicité, sans argent réel.
+            Gratuit. Sans pub. Orakl ne vend rien — il juge.
           </p>
           <Link
             to={isAuthenticated ? '/create' : '/register'}
