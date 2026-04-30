@@ -305,7 +305,7 @@ export default function HomePage() {
           {[
             { step: 'I',   icon: '✦', title: 'Révèle',  desc: 'Formule une question. Ajoute tes options. Fixe l\'heure du jugement.' },
             { step: 'II',  icon: '◈', title: 'Convoque', desc: 'Envoie le lien de l\'invocation à tes amis. Ils rejoignent en un clic.' },
-            { step: 'III', icon: '⚖', title: 'Juge',     desc: 'Orakl te juge. Les points tombent. Tes amis t'en voudront peut-être.' },
+            { step: 'III', icon: '⚖', title: 'Juge',     desc: "Orakl te juge. Les points tombent. Tes amis t'en voudront peut-être." },
           ].map(s => (
             <div key={s.step} className="flex flex-col items-center">
               <div
