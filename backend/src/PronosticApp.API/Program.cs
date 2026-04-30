@@ -86,7 +86,14 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
 // ─── Controllers + Swagger ─────────────────────────────────────────────────
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Sérialise les enums en string ("Open", "Draft"…) au lieu de nombres (0, 1…)
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()
+        );
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
