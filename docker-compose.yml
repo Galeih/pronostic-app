@@ -31,6 +31,8 @@ services:
       Jwt__ExpiryInDays: "7"
       DbProvider: postgresql
       Cors__AllowedOrigins: ${APP_URL}
+    volumes:
+      - dataprotection_keys:/root/.aspnet/DataProtection-Keys
     depends_on:
       db:
         condition: service_healthy
@@ -42,9 +44,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-80}:80"
+      - "127.0.0.1:${APP_PORT:-8081}:80"
     depends_on:
       - api
 
 volumes:
   postgres_data:
+  dataprotection_keys:
