@@ -39,4 +39,9 @@ export const predictionService = {
     const res = await api.get<Prediction[]>('/predictions/me')
     return res.data
   },
+
+  async getVoters(predictionId: string): Promise<{ userId: string; userName: string }[]> {
+    const res = await api.get(`/predictions/${predictionId}/voters`)
+    return res.data
+  },
 }

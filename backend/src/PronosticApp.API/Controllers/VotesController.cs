@@ -137,6 +137,42 @@ public class VotesController : ControllerBase
         });
     }
 
+    // ─── GET /api/predictions/{predictionId}/voters ────────────────────────
+    /// <summary>
+    /// Retourne la liste des votants (userId + userName) pour cibler un Sabotage.
+    /// Accessible uniquement aux autres participants ayant voté, quand le pronostic
+    /// est encore ouvert et que le sabotage est activé.
+    /// </summary>
+    [HttpGet("voters")]
+    [Authorize]
+    public async Task<ActionResult> GetVoters(Guid predictionId)
+    {
+        var prediction = await _db.Predictions
+            .Include(p => p.Votes)
+                .ThenInclude(v => v.User)
+            .FirstOrDefaultAsync(p => p.Id == predictionId);
+
+        if (prediction == null) return NotFound();
+
+        if (!prediction.AllowSabotage)
+            return BadRequest(new { message = "Le sabotage n'est pas activé sur ce pronostic." });
+
+        if (prediction.Status != PredictionStatus.Open)
+            return BadRequest(new { message = "Les votes sont fermés." });
+
+        // Seul un participant ayant voté peut voir les autres
+        var hasVoted = prediction.Votes.Any(v => v.UserId == CurrentUserId);
+        if (!hasVoted)
+            return BadRequest(new { message = "Tu dois voter avant de pouvoir cibler un adversaire." });
+
+        var voters = prediction.Votes
+            .Where(v => v.UserId != CurrentUserId)
+            .Select(v => new { userId = v.UserId, userName = v.User.UserName ?? "?" })
+            .ToList();
+
+        return Ok(voters);
+    }
+
     // ─── GET /api/predictions/{predictionId}/votes ─────────────────────────
     /// <summary>Retourne les votes publics (uniquement après résolution).</summary>
     [HttpGet("votes")]

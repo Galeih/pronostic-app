@@ -244,11 +244,13 @@ public class PredictionsController : ControllerBase
             {
                 player.TotalPoints += vote.RewardPoints;
                 player.Experience  += 50;
+                ApplyLevelUp(player);
                 await _userManager.UpdateAsync(player);
             }
             else if (player != null)
             {
                 player.Experience += 10;
+                ApplyLevelUp(player);
                 await _userManager.UpdateAsync(player);
             }
         }
@@ -259,10 +261,37 @@ public class PredictionsController : ControllerBase
         if (prediction.Votes.Count >= 3)
         {
             creator!.Experience += 30;
+            ApplyLevelUp(creator);
             await _userManager.UpdateAsync(creator);
         }
 
+        await CheckAndGrantBadgesAsync(prediction);
+        await _db.SaveChangesAsync();
+
         return Ok(MapToResponse(prediction, creator!, GetMyVote(prediction)));
+    }
+
+    // ─── Calcul du niveau à partir de l'XP ───────────────────────────────
+    /// <summary>
+    /// Niveau correspondant à un total d'XP donné.
+    /// Seuil du niveau n : n² × 100 XP  (niveau 1 = 100, 2 = 400, 3 = 900…)
+    /// </summary>
+    private static int LevelForExperience(int xp)
+    {
+        int level = 1;
+        while (level * level * 100 <= xp)
+            level++;
+        return level - 1;
+    }
+
+    /// <summary>
+    /// Met à jour le Level du joueur si son XP a franchi un seuil.
+    /// </summary>
+    private static void ApplyLevelUp(AppUser player)
+    {
+        int expectedLevel = Math.Max(1, LevelForExperience(player.Experience));
+        if (player.Level < expectedLevel)
+            player.Level = expectedLevel;
     }
 
     // ─── Fermeture automatique ────────────────────────────────────────────
@@ -355,6 +384,116 @@ public class PredictionsController : ControllerBase
             RewardPoints   = vote.RewardPoints,
             CreatedAt      = vote.CreatedAt,
         };
+    }
+
+    // ─── Attribution des badges ───────────────────────────────────────────
+    private async Task CheckAndGrantBadgesAsync(Prediction prediction)
+    {
+        var badges = await _db.Badges.Where(b => b.IsActive).ToListAsync();
+        if (!badges.Any()) return;
+
+        var totalVotes  = prediction.Votes.Count;
+        var boostUsages = prediction.BoostUsages.ToList();
+
+        foreach (var vote in prediction.Votes)
+        {
+            // LAST_MINUTE_VOTE : voter dans les 5 dernières minutes avant la deadline
+            if ((prediction.VoteDeadline - vote.CreatedAt).TotalMinutes <= 5)
+                await GrantBadgeIfNeeded(vote.UserId, "LAST_MINUTE_VOTE", badges, prediction.Id);
+
+            if (vote.IsCorrect == true)
+            {
+                // SNIPE_WIN : gagner avec une option qui avait < 10 % des votes (min 5 votants)
+                if (totalVotes >= 5)
+                {
+                    var optionVotes = prediction.Options
+                        .FirstOrDefault(o => o.Id == vote.OptionId)?.Votes.Count ?? 0;
+                    if ((double)optionVotes / totalVotes < 0.10)
+                        await GrantBadgeIfNeeded(vote.UserId, "SNIPE_WIN", badges, prediction.Id);
+                }
+
+                // WIN_WITH_CORRECTION : gagner après avoir utilisé le boost Correction
+                if (vote.UsedCorrectionBoost)
+                    await GrantBadgeIfNeeded(vote.UserId, "WIN_WITH_CORRECTION", badges, prediction.Id);
+
+                // WIN_WITH_DOUBLE_VOTE : gagner en ayant utilisé le Double Vote
+                if (vote.IsSecondVote)
+                    await GrantBadgeIfNeeded(vote.UserId, "WIN_WITH_DOUBLE_VOTE", badges, prediction.Id);
+
+                // WIN_DESPITE_SABOTAGE : gagner malgré un sabotage non bloqué
+                var wasSabotaged = boostUsages.Any(bu =>
+                    bu.TargetUserId    == vote.UserId &&
+                    bu.Boost.BoostType == BoostType.Sabotage &&
+                    !bu.WasBlocked);
+                if (wasSabotaged)
+                    await GrantBadgeIfNeeded(vote.UserId, "WIN_DESPITE_SABOTAGE", badges, prediction.Id);
+
+                // WIN_STREAK : 5 dernières participations résolues toutes correctes
+                var recentWinVotes = await _db.Votes
+                    .Where(v => v.UserId == vote.UserId && v.IsCorrect.HasValue)
+                    .OrderByDescending(v => v.CreatedAt)
+                    .Take(5)
+                    .ToListAsync();
+                if (recentWinVotes.Count == 5 && recentWinVotes.All(v => v.IsCorrect == true))
+                    await GrantBadgeIfNeeded(vote.UserId, "WIN_STREAK", badges, prediction.Id);
+            }
+            else
+            {
+                // LOSS_STREAK : 10 dernières participations résolues toutes incorrectes
+                var recentLossVotes = await _db.Votes
+                    .Where(v => v.UserId == vote.UserId && v.IsCorrect.HasValue)
+                    .OrderByDescending(v => v.CreatedAt)
+                    .Take(10)
+                    .ToListAsync();
+                if (recentLossVotes.Count == 10 && recentLossVotes.All(v => v.IsCorrect == false))
+                    await GrantBadgeIfNeeded(vote.UserId, "LOSS_STREAK", badges, prediction.Id);
+            }
+
+            // DAILY_PARTICIPATION_STREAK : avoir voté sur >= 7 pronostics résolus
+            var playedCount = await _db.Votes
+                .CountAsync(v => v.UserId == vote.UserId && v.IsCorrect.HasValue);
+            if (playedCount >= 7)
+                await GrantBadgeIfNeeded(vote.UserId, "DAILY_PARTICIPATION_STREAK", badges, prediction.Id);
+        }
+
+        // SABOTAGE_SUCCESS : avoir saboté quelqu'un qui a finalement gagné
+        var sabotageUsages = boostUsages
+            .Where(bu => bu.Boost.BoostType == BoostType.Sabotage && !bu.WasBlocked)
+            .ToList();
+        foreach (var sab in sabotageUsages)
+        {
+            if (sab.TargetUserId == null) continue;
+            var targetVote = prediction.Votes.FirstOrDefault(v => v.UserId == sab.TargetUserId);
+            if (targetVote?.IsCorrect == true)
+                await GrantBadgeIfNeeded(sab.UserId, "SABOTAGE_SUCCESS", badges, prediction.Id);
+        }
+
+        // PREDICTIONS_CREATED : créateur ayant résolu >= 50 pronostics
+        var createdCount = await _db.Predictions
+            .CountAsync(p => p.CreatorId == prediction.CreatorId &&
+                             p.Status    == PredictionStatus.Resolved);
+        if (createdCount >= 50)
+            await GrantBadgeIfNeeded(prediction.CreatorId, "PREDICTIONS_CREATED", badges, prediction.Id);
+    }
+
+    private async Task GrantBadgeIfNeeded(
+        string userId, string conditionType,
+        List<Badge> badges, Guid predictionId)
+    {
+        var badge = badges.FirstOrDefault(b => b.ConditionType == conditionType);
+        if (badge == null) return;
+
+        var alreadyHas = await _db.UserBadges
+            .AnyAsync(ub => ub.UserId == userId && ub.BadgeId == badge.Id);
+        if (alreadyHas) return;
+
+        _db.UserBadges.Add(new UserBadge
+        {
+            UserId              = userId,
+            BadgeId             = badge.Id,
+            UnlockedAt          = DateTime.UtcNow,
+            RelatedPredictionId = predictionId,
+        });
     }
 
     // ─── Mapping entite -> DTO ────────────────────────────────────────────

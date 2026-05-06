@@ -123,6 +123,17 @@ export interface UserBoost {
   expiresAt?: string
 }
 
+// Réponse du catalogue GET /api/boosts (inclut la quantité possédée)
+export interface BoostCatalogItem {
+  id: string
+  name: string
+  description: string
+  boostType: BoostType
+  rarity: BadgeRarity
+  effectValue: number
+  ownedQuantity: number
+}
+
 // Reponse de l'API POST /vote
 export interface VoteApiResponse {
   voteId: string

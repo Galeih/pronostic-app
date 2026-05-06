@@ -131,16 +131,38 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // EnsureCreated crée le schéma si inexistant (dev + premier démarrage prod)
+    // EnsureCreated crée le schéma si inexistant.
+    // Pour SQLite (dev) : si le schéma est obsolète (colonnes manquantes ajoutées
+    // au modèle après la création initiale), on recrée la base proprement.
     db.Database.EnsureCreated();
 
-    // Seed des rôles de base
+    if (dbProvider != "postgresql")
+    {
+        var schemaOk = await IsSqliteSchemaUpToDateAsync(db);
+        if (!schemaOk)
+        {
+            Log.Warning("Schéma SQLite obsolète détecté — recréation de la base de données...");
+            db.Database.EnsureDeleted();
+            db.Database.EnsureCreated();
+            Log.Warning("Base de données recréée avec succès.");
+        }
+    }
+
+    // ── Seed des rôles de base ─────────────────────────────────────────────
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var role in new[] { "Admin", "Player" })
     {
         if (!await roleManager.RoleExistsAsync(role))
             await roleManager.CreateAsync(new IdentityRole(role));
     }
+
+    // Note : les Boosts et Badges sont seedés via HasData dans leurs configurations EF
+    // (BoostConfiguration.cs et BadgeConfiguration.cs) — EnsureCreated() les applique.
+
+    // ── Backfill boosts pour les comptes existants ─────────────────────────
+    // Attribue le kit de départ à tout utilisateur qui n'a encore aucun boost.
+    // Idempotent : ne fait rien si l'utilisateur a déjà au moins un UserBoost.
+    await BackfillStarterBoostsAsync(db);
 }
 
 // ─── Pipeline HTTP ─────────────────────────────────────────────────────────
@@ -163,3 +185,83 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// ─── Vérification du schéma SQLite ────────────────────────────────────────────
+// Vérifie que toutes les colonnes attendues du modèle actuel existent en base.
+// Retourne false si au moins une colonne est manquante → la base sera recréée.
+static async Task<bool> IsSqliteSchemaUpToDateAsync(AppDbContext db)
+{
+    var conn = db.Database.GetDbConnection();
+    var needClose = conn.State != System.Data.ConnectionState.Open;
+    if (needClose) await conn.OpenAsync();
+
+    try
+    {
+        async Task<bool> HasColumn(string table, string column)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='{column}'";
+            return (long)(await cmd.ExecuteScalarAsync())! > 0;
+        }
+
+        // Colonnes ajoutées au modèle après la création initiale de la base
+        var checks = new[]
+        {
+            await HasColumn("Predictions", "IsAnonymous"),
+            await HasColumn("Votes",       "SecondOptionId"),
+            await HasColumn("Votes",       "IsSecondVote"),
+            await HasColumn("Votes",       "UsedCorrectionBoost"),
+        };
+
+        return checks.All(ok => ok);
+    }
+    finally
+    {
+        if (needClose) await conn.CloseAsync();
+    }
+}
+
+// ─── Backfill kit de boosts pour les utilisateurs existants ───────────────────
+// Pour chaque utilisateur sans aucun boost, attribue le kit de départ.
+// Ne tourne qu'une fois par compte : si l'utilisateur a déjà ≥1 UserBoost, on saute.
+static async Task BackfillStarterBoostsAsync(AppDbContext db)
+{
+    var starterKit = new[]
+    {
+        (PronosticApp.Domain.Enums.BoostType.VoteCorrection, 2),
+        (PronosticApp.Domain.Enums.BoostType.SecondVote,     1),
+        (PronosticApp.Domain.Enums.BoostType.Sabotage,       1),
+        (PronosticApp.Domain.Enums.BoostType.Shield,         1),
+    };
+
+    // Utilisateurs qui n'ont aucun boost
+    var usersWithoutBoosts = await db.Users
+        .Where(u => !u.IsGuest && !db.UserBoosts.Any(ub => ub.UserId == u.Id))
+        .Select(u => u.Id)
+        .ToListAsync();
+
+    if (usersWithoutBoosts.Count == 0) return;
+
+    var boosts = await db.Boosts.Where(b => b.IsActive).ToListAsync();
+
+    foreach (var userId in usersWithoutBoosts)
+    {
+        foreach (var (boostType, qty) in starterKit)
+        {
+            var boost = boosts.FirstOrDefault(b => b.BoostType == boostType);
+            if (boost == null) continue;
+
+            db.UserBoosts.Add(new PronosticApp.Domain.Entities.UserBoost
+            {
+                UserId     = userId,
+                BoostId    = boost.Id,
+                Quantity   = qty,
+                AcquiredAt = DateTime.UtcNow,
+            });
+        }
+    }
+
+    await db.SaveChangesAsync();
+    Log.Information("Backfill boosts : kit attribué à {Count} utilisateur(s) existant(s).", usersWithoutBoosts.Count);
+}

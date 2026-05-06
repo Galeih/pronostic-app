@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { userService, type ProfileData } from '../../services/userService'
+import { boostService } from '../../services/boostService'
+import type { BoostCatalogItem } from '../../types'
 import Navbar from '../../components/layout/Navbar'
 
 const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
@@ -14,13 +16,25 @@ const RARITY_STYLES: Record<string, { border: string; bg: string; color: string 
   Secret:    { border: '#8a2a5a', bg: '#1a0814',   color: '#e060a0' },
 }
 
+const BOOST_ICONS: Record<string, string> = {
+  VoteCorrection: '🔄',
+  SecondVote:     '✌',
+  Sabotage:       '⚔',
+  Shield:         '🛡',
+}
+
 export default function ProfilePage() {
   const [profile, setProfile]   = useState<ProfileData | null>(null)
+  const [catalog, setCatalog]   = useState<BoostCatalogItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError]         = useState<string | null>(null)
 
   useEffect(() => {
-    userService.getMyProfile().then(setProfile).catch(() => setError('Impossible de charger le profil.')).finally(() => setIsLoading(false))
+    userService.getMyProfile()
+      .then(setProfile)
+      .catch(() => setError('Impossible de charger le profil.'))
+      .finally(() => setIsLoading(false))
+    boostService.getCatalog().then(setCatalog).catch(() => {})
   }, [])
 
   if (isLoading) return (
@@ -117,6 +131,68 @@ export default function ProfilePage() {
               <p className="text-xs mt-0.5" style={{ color: '#6b5010' }}>{s.label}</p>
             </div>
           ))}
+        </div>
+
+        {/* Boosts */}
+        <div className="relative p-6 rounded mb-6" style={cardStyle}>
+          <span style={{ position:'absolute', top:8, left:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
+          <span style={{ position:'absolute', top:8, right:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-lg" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>⚡ Pouvoirs</h2>
+            <span className="text-xs rounded-full px-3 py-1" style={{ background: '#0e0c08', border: '1px solid #2a2218', color: '#6b5010' }}>
+              {catalog.filter(b => b.ownedQuantity > 0).length} disponible{catalog.filter(b => b.ownedQuantity > 0).length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {catalog.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-8 h-8 rounded-full border-2 animate-spin mx-auto" style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+            </div>
+          ) : catalog.every(b => b.ownedQuantity === 0) ? (
+            <div className="text-center py-8">
+              <p className="text-4xl mb-2" style={{ color: '#3a2d10' }}>⚡</p>
+              <p className="text-sm" style={{ color: '#3a2d10' }}>Aucun pouvoir en réserve.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {catalog.map(b => {
+                const rs = RARITY_STYLES[b.rarity] ?? RARITY_STYLES.Common
+                const icon = BOOST_ICONS[b.boostType] ?? '⚡'
+                const exhausted = b.ownedQuantity === 0
+                return (
+                  <div
+                    key={b.id}
+                    className="rounded px-4 py-3 flex items-center gap-3"
+                    style={{
+                      background: exhausted ? '#0a0908' : rs.bg,
+                      border: `1px solid ${exhausted ? '#1a1510' : rs.border}`,
+                      opacity: exhausted ? 0.4 : 1,
+                    }}
+                  >
+                    <span className="text-2xl flex-shrink-0">{icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm truncate" style={{ color: exhausted ? '#3a2d10' : rs.color, fontFamily: '"Cinzel", serif' }}>
+                        {b.name}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: '#6b5010' }}>{b.description}</p>
+                      <p className="text-xs mt-1" style={{ color: exhausted ? '#2a2218' : '#3a2d10' }}>{b.rarity}</p>
+                    </div>
+                    <span
+                      className="flex-shrink-0 text-sm font-black px-2.5 py-1 rounded-full"
+                      style={{
+                        background: exhausted ? '#1a1510' : '#0e0c08',
+                        color: exhausted ? '#2a2218' : '#c8880c',
+                        border: `1px solid ${exhausted ? '#1a1510' : '#3a2d10'}`,
+                        fontFamily: '"Cinzel", serif',
+                      }}
+                    >
+                      ×{b.ownedQuantity}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Badges */}

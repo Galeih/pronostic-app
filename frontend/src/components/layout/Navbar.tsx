@@ -6,18 +6,28 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
   const navigate  = useNavigate()
   const location  = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen,   setMenuOpen]   = useState(false)
+  const [burgerOpen, setBurgerOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
     navigate('/')
     setMenuOpen(false)
+    setBurgerOpen(false)
   }
 
   const isActive = (path: string) =>
     location.pathname === path
       ? 'text-amber-300 font-semibold'
       : 'text-amber-700 hover:text-amber-300'
+
+  const navLinks = isAuthenticated
+    ? [
+        { to: '/create',      label: '✦ Créer' },
+        { to: '/history',     label: 'Archives' },
+        { to: '/leaderboard', label: 'Orakl' },
+      ]
+    : []
 
   return (
     <nav className="sticky top-0 z-50" style={{ background: '#0e0c08', borderBottom: '1px solid #6b5010' }}>
@@ -29,6 +39,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link
           to="/"
+          onClick={() => setBurgerOpen(false)}
           style={{ fontFamily: '"Cinzel Decorative", serif', letterSpacing: '0.05em' }}
           className="text-lg font-bold flex-shrink-0 flex items-center gap-1.5"
         >
@@ -41,23 +52,48 @@ export default function Navbar() {
 
         {/* Desktop nav links */}
         <div className="hidden sm:flex items-center gap-6 text-sm" style={{ fontFamily: '"Cinzel", serif' }}>
-          {isAuthenticated && (
-            <>
-              <Link to="/create" className={`transition ${isActive('/create')}`}>
-                ✦ Creer
-              </Link>
-              <Link to="/history" className={`transition ${isActive('/history')}`}>
-                Archives
-              </Link>
-              <Link to="/leaderboard" className={`transition ${isActive('/leaderboard')}`}>
-                Orakl
-              </Link>
-            </>
-          )}
+          {navLinks.map(link => (
+            <Link key={link.to} to={link.to} className={`transition ${isActive(link.to)}`}>
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        {/* User menu */}
-        <div className="flex items-center gap-3">
+        {/* Right side: user menu + burger */}
+        <div className="flex items-center gap-2">
+
+          {/* Burger button (mobile only) */}
+          {isAuthenticated && (
+            <button
+              className="sm:hidden flex flex-col justify-center items-center w-8 h-8 gap-1"
+              onClick={() => setBurgerOpen(o => !o)}
+              aria-label="Menu"
+            >
+              <span
+                className="block w-5 h-0.5 transition-all duration-200"
+                style={{
+                  background: '#c8880c',
+                  transform: burgerOpen ? 'rotate(45deg) translate(3px, 3px)' : 'none',
+                }}
+              />
+              <span
+                className="block w-5 h-0.5 transition-all duration-200"
+                style={{
+                  background: '#c8880c',
+                  opacity: burgerOpen ? 0 : 1,
+                }}
+              />
+              <span
+                className="block w-5 h-0.5 transition-all duration-200"
+                style={{
+                  background: '#c8880c',
+                  transform: burgerOpen ? 'rotate(-45deg) translate(3px, -3px)' : 'none',
+                }}
+              />
+            </button>
+          )}
+
+          {/* User dropdown (desktop) */}
           {isAuthenticated ? (
             <div className="relative">
               <button
@@ -86,13 +122,12 @@ export default function Navbar() {
                   className="absolute right-0 mt-2 w-52 rounded-lg shadow-2xl overflow-hidden z-50"
                   style={{ background: '#161209', border: '1px solid #6b5010' }}
                 >
-                  {/* Corner ornaments */}
                   <div style={{
                     background: 'linear-gradient(135deg, #1e1810, #2a2218)',
                     borderBottom: '1px solid #6b5010',
                     padding: '12px 16px'
                   }}>
-                    <p className="text-xs" style={{ color: '#6b5010' }}>Initie des mysteres</p>
+                    <p className="text-xs" style={{ color: '#6b5010' }}>Initié des mystères</p>
                     <p className="text-sm font-semibold" style={{ color: '#f0dfa8', fontFamily: '"Cinzel", serif' }}>
                       {user?.userName}
                     </p>
@@ -102,14 +137,14 @@ export default function Navbar() {
                   </div>
 
                   {[
-                    { to: '/profile', label: '◈ Mon profil', onClick: () => setMenuOpen(false) },
-                    { to: '/history', label: '◈ Archives', onClick: () => setMenuOpen(false) },
-                    { to: '/create',  label: '◈ Nouveau pronostic', onClick: () => setMenuOpen(false) },
+                    { to: '/profile', label: '◈ Mon profil' },
+                    { to: '/history', label: '◈ Archives' },
+                    { to: '/create',  label: '◈ Nouveau pronostic' },
                   ].map(item => (
                     <Link
                       key={item.to}
                       to={item.to}
-                      onClick={item.onClick}
+                      onClick={() => setMenuOpen(false)}
                       className="flex items-center px-4 py-2.5 text-sm transition"
                       style={{ color: '#b89a60' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#f5c842'; (e.currentTarget as HTMLElement).style.background = '#1e1810' }}
@@ -161,8 +196,50 @@ export default function Navbar() {
       {/* Bottom gold line */}
       <div style={{ height: '1px', background: 'linear-gradient(to right, transparent, #6b5010, transparent)' }} />
 
-      {menuOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+      {/* Mobile burger menu panel */}
+      {burgerOpen && isAuthenticated && (
+        <div style={{ background: '#0e0c08', borderBottom: '1px solid #6b5010' }}>
+          <div className="max-w-5xl mx-auto px-4 py-2 flex flex-col gap-1">
+            {navLinks.map(link => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setBurgerOpen(false)}
+                className="px-3 py-2.5 text-sm rounded transition"
+                style={{
+                  fontFamily: '"Cinzel", serif',
+                  color: location.pathname === link.to ? '#f5c842' : '#b89a60',
+                  background: location.pathname === link.to ? '#1e1810' : 'transparent',
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              to="/profile"
+              onClick={() => setBurgerOpen(false)}
+              className="px-3 py-2.5 text-sm rounded transition"
+              style={{ fontFamily: '"Cinzel", serif', color: '#b89a60' }}
+            >
+              ◈ Mon profil
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-left px-3 py-2.5 text-sm rounded transition"
+              style={{ color: '#9a4040', fontFamily: '"Cinzel", serif' }}
+            >
+              ✦ Quitter le cercle
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop for dropdowns */}
+      {(menuOpen || burgerOpen) && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => { setMenuOpen(false); setBurgerOpen(false) }}
+        />
       )}
     </nav>
   )

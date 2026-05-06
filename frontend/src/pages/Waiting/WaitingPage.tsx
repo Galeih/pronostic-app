@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { predictionService } from '../../services/predictionService'
+import { boostService }      from '../../services/boostService'
 import { useAuth } from '../../context/AuthContext'
-import type { Prediction } from '../../types'
+import type { Prediction, BoostCatalogItem } from '../../types'
+import BoostPanel from './BoostPanel'
 
 function useCountdown(targetDate: string | undefined) {
   const calc = () => targetDate ? Math.max(0, new Date(targetDate).getTime() - Date.now()) : null
@@ -23,6 +25,7 @@ export default function WaitingPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [prediction, setPrediction] = useState<Prediction | null>(null)
+  const [catalog, setCatalog]       = useState<BoostCatalogItem[]>([])
   const [isLoading, setIsLoading]   = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [copied, setCopied]         = useState(false)
@@ -35,6 +38,11 @@ export default function WaitingPage() {
       if (p.status === 'Resolved') { navigate(`/p/${shareCode}/result`, { replace: true }); return }
       if (p.status === 'Open' && !p.myVote) { navigate(`/p/${shareCode}/vote`, { replace: true }); return }
       setPrediction(p)
+
+      // Charger le catalogue de boosts si applicable
+      if (p.allowBoosts && p.status === 'Open' && p.myVote) {
+        boostService.getCatalog().then(setCatalog).catch(() => {})
+      }
     } catch { setError('Pronostic introuvable.') }
     finally { setIsLoading(false) }
   }, [shareCode, navigate])
@@ -74,10 +82,12 @@ export default function WaitingPage() {
     </div>
   )
 
-  const myVoteOption = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
-  const isCreator   = user?.id === prediction.creatorId
-  const votesOpen   = prediction.status === 'Open'
-  const votesClosed = prediction.status === 'VoteClosed' || prediction.status === 'AwaitingResolution'
+  const myVoteOption   = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
+  const mySecondOption = prediction.myVote?.secondOptionId ? prediction.options.find(o => o.id === prediction.myVote!.secondOptionId) : null
+  const isCreator      = user?.id === prediction.creatorId
+  const votesOpen      = prediction.status === 'Open'
+  const votesClosed    = prediction.status === 'VoteClosed' || prediction.status === 'AwaitingResolution'
+  const showBoosts     = votesOpen && !!prediction.myVote && prediction.allowBoosts && catalog.length > 0
 
   return (
     <div style={pageStyle} className="flex flex-col">
@@ -140,6 +150,13 @@ export default function WaitingPage() {
               <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#c8880c' }} />
               <p className="font-semibold" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{myVoteOption.label}</p>
             </div>
+            {mySecondOption && (
+              <div className="mt-2 rounded px-4 py-3 flex items-center gap-3" style={{ background: '#1a1a2e', border: '1px solid #4a4a8a' }}>
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#7070d0' }} />
+                <p className="text-sm font-semibold" style={{ color: '#a0a0f0', fontFamily: '"Cinzel", serif' }}>{mySecondOption.label}</p>
+                <span className="ml-auto text-xs" style={{ color: '#4a4a8a' }}>2ᵉ vote</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -163,6 +180,14 @@ export default function WaitingPage() {
             </div>
           )}
         </div>
+
+        {showBoosts && (
+          <BoostPanel
+            prediction={prediction}
+            catalog={catalog}
+            onCorrectionApplied={load}
+          />
+        )}
 
         {isCreator && votesClosed && (
           <div className="rounded p-5 text-center" style={{ background: '#1a1208', border: '1px solid #c8880c', boxShadow: '0 0 20px #c8880c20' }}>
