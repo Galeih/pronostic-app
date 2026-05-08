@@ -162,7 +162,14 @@ using (var scope = app.Services.CreateScope())
     // au modèle après la création initiale), on recrée la base proprement.
     db.Database.EnsureCreated();
 
-    if (dbProvider != "postgresql")
+    if (dbProvider == "postgresql")
+    {
+        // EnsureCreated ne crée pas les nouvelles tables sur une BDD déjà existante.
+        // On applique manuellement un DDL idempotent pour chaque table ajoutée après
+        // la création initiale.
+        await EnsurePostgresqlTablesAsync(db);
+    }
+    else
     {
         var schemaOk = await IsSqliteSchemaUpToDateAsync(db);
         if (!schemaOk)
@@ -251,6 +258,80 @@ static async Task<bool> IsSqliteSchemaUpToDateAsync(AppDbContext db)
         };
 
         return checks.All(ok => ok);
+    }
+    finally
+    {
+        if (needClose) await conn.CloseAsync();
+    }
+}
+
+// ─── Création des tables PostgreSQL manquantes (DDL idempotent) ───────────────
+// EnsureCreated ne modifie pas une base existante.
+// Cette fonction applique un CREATE TABLE IF NOT EXISTS pour chaque table
+// ajoutée après le déploiement initial.
+static async Task EnsurePostgresqlTablesAsync(AppDbContext db)
+{
+    var conn = db.Database.GetDbConnection();
+    var needClose = conn.State != System.Data.ConnectionState.Open;
+    if (needClose) await conn.OpenAsync();
+
+    try
+    {
+        var sql = """
+            -- ── Groups ────────────────────────────────────────────────────────────
+            CREATE TABLE IF NOT EXISTS "Groups" (
+                "Id"          uuid         NOT NULL DEFAULT gen_random_uuid(),
+                "OwnerId"     text         NOT NULL,
+                "Name"        text         NOT NULL,
+                "Description" text,
+                "AvatarUrl"   text,
+                "IsPrivate"   boolean      NOT NULL DEFAULT true,
+                "InviteCode"  text         NOT NULL,
+                "CreatedAt"   timestamptz  NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_Groups" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_Groups_AspNetUsers_OwnerId"
+                    FOREIGN KEY ("OwnerId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+
+            -- ── GroupMembers ───────────────────────────────────────────────────────
+            CREATE TABLE IF NOT EXISTS "GroupMembers" (
+                "Id"       uuid        NOT NULL DEFAULT gen_random_uuid(),
+                "GroupId"  uuid        NOT NULL,
+                "UserId"   text        NOT NULL,
+                "Role"     text        NOT NULL DEFAULT 'Member',
+                "JoinedAt" timestamptz NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_GroupMembers" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_GroupMembers_Groups_GroupId"
+                    FOREIGN KEY ("GroupId") REFERENCES "Groups" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_GroupMembers_AspNetUsers_UserId"
+                    FOREIGN KEY ("UserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_GroupMembers_GroupId_UserId"
+                ON "GroupMembers" ("GroupId", "UserId");
+
+            -- ── Messages ───────────────────────────────────────────────────────────
+            CREATE TABLE IF NOT EXISTS "Messages" (
+                "Id"                  uuid        NOT NULL DEFAULT gen_random_uuid(),
+                "GroupId"             uuid        NOT NULL,
+                "SenderId"            text        NOT NULL,
+                "Content"             text        NOT NULL,
+                "Type"                text        NOT NULL DEFAULT 'Text',
+                "PredictionShareCode" text,
+                "CreatedAt"           timestamptz NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_Messages" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_Messages_Groups_GroupId"
+                    FOREIGN KEY ("GroupId") REFERENCES "Groups" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_Messages_AspNetUsers_SenderId"
+                    FOREIGN KEY ("SenderId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_Messages_GroupId_CreatedAt"
+                ON "Messages" ("GroupId", "CreatedAt");
+            """;
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        await cmd.ExecuteNonQueryAsync();
+        Log.Information("Tables PostgreSQL vérifiées / créées (Groups, GroupMembers, Messages).");
     }
     finally
     {
