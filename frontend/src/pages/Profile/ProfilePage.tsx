@@ -305,7 +305,6 @@ export default function ProfilePage() {
               {showEmptyBoosts && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
                   {emptyBoosts.map(b => {
-                    const _rs = RARITY_STYLES[b.rarity] ?? RARITY_STYLES.Common
                     const icon = BOOST_ICONS[b.boostType] ?? '⚡'
                     return (
                       <div key={b.id} className="rounded px-4 py-2.5 flex items-center gap-3"
