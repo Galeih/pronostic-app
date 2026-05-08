@@ -74,6 +74,14 @@ export default function WaitingPage() {
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
+  // Rafraîchit catalog + usages après Shield / Sabotage
+  const handleBoostUsed = useCallback(() => {
+    boostService.getCatalog().then(setCatalog).catch(() => {})
+    if (prediction) {
+      boostService.getUsages(prediction.id).then(setBoostUsages).catch(() => {})
+    }
+  }, [prediction])
+
   if (isLoading) return (
     <div style={pageStyle} className="flex items-center justify-center">
       <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
@@ -103,12 +111,6 @@ export default function WaitingPage() {
 
   // Bouclier actif : une entrée Shield déployée et non encore consommée par un sabotage
   const hasActiveShield = boostUsages.some(u => u.boostType === 'Shield' && !u.wasBlocked)
-
-  // Rafraîchit catalog + usages après Shield / Sabotage (sans recharger la prediction entière)
-  const handleBoostUsed = useCallback(() => {
-    boostService.getCatalog().then(setCatalog).catch(() => {})
-    if (prediction) boostService.getUsages(prediction.id).then(setBoostUsages).catch(() => {})
-  }, [prediction])
 
   return (
     <div style={pageStyle} className="flex flex-col">
