@@ -531,10 +531,18 @@ public class PredictionsController : ControllerBase
             CreatedAt        = prediction.CreatedAt,
             PublishedAt      = prediction.PublishedAt,
             ResolvedAt       = prediction.ResolvedAt,
-            ParticipantCount = totalVotes,
-            MyVote           = myVote,
-            IsCreator        = isCreator,
-            Options          = prediction.Options
+            ParticipantCount       = totalVotes,
+            MyVote                 = myVote,
+            IsCreator              = isCreator,
+            // Nombre réel de gagnants (vote principal OU second vote correct)
+            WinnerCount            = isResolved
+                ? prediction.Votes.Count(v => v.IsCorrect == true)
+                : null,
+            // Points réellement distribués (tient compte du double vote, sabotages, etc.)
+            TotalPointsDistributed = isResolved
+                ? prediction.Votes.Sum(v => v.RewardPoints)
+                : null,
+            Options                = prediction.Options
                 .OrderBy(o => o.SortOrder)
                 .Select(o => new OptionResponse
                 {

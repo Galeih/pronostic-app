@@ -1,10 +1,20 @@
 import api from './api'
-import type { BoostCatalogItem } from '../types'
+import type { BoostCatalogItem, BoostUsageResponse } from '../types'
 
 export const boostService = {
   /** Catalogue des boosts avec quantités possédées (requiert auth) */
   async getCatalog(): Promise<BoostCatalogItem[]> {
     const res = await api.get<BoostCatalogItem[]>('/boosts')
+    return res.data
+  },
+
+  /**
+   * Historique des boosts utilisés sur un pronostic.
+   * Non-créateur avant résolution : retourne uniquement ses propres usages.
+   * Après résolution : tout est révélé.
+   */
+  async getUsages(predictionId: string): Promise<BoostUsageResponse[]> {
+    const res = await api.get<BoostUsageResponse[]>(`/predictions/${predictionId}/boosts`)
     return res.data
   },
 

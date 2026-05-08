@@ -28,41 +28,60 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 function HistoryCard({ item }: { item: HistoryItem }) {
-  const isResolved = item.status === 'Resolved'
-  const won  = item.myVote?.isCorrect === true
-  const lost = item.myVote?.isCorrect === false
-  const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.Draft
+  const isResolved   = item.status === 'Resolved'
+  const isPending    = !isResolved && item.status !== 'Cancelled'
+  const won          = item.myVote?.isCorrect === true
+  const lost         = item.myVote?.isCorrect === false
+  const hasSecondVote = !!item.myVote?.secondOptionLabel
+  const sc           = STATUS_COLORS[item.status] ?? STATUS_COLORS.Draft
+
+  // Couleur du vote affiché
+  const voteColor = won ? '#a0ff70' : lost ? '#e05050' : '#c8880c'
 
   return (
     <Link
-      to={`/p/${item.shareCode}${isResolved ? '/result' : ''}`}
-      className="block p-4 rounded transition group"
-      style={{
-        background: '#161209',
-        border: '1px solid #3a2d10',
-      }}
+      to={`/p/${item.shareCode}${isResolved ? '/result' : isPending ? '/waiting' : ''}`}
+      className="block p-4 rounded transition"
+      style={{ background: '#161209', border: '1px solid #3a2d10' }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#6b5010')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#3a2d10')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-snug line-clamp-2 transition"
+
+          {/* Question */}
+          <p className="text-sm font-semibold leading-snug line-clamp-2"
             style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
             « {item.question} »
           </p>
 
+          {/* Vote(s) */}
           {item.myVote?.optionLabel && (
-            <p className="text-xs mt-1.5" style={{ color: '#6b5010' }}>
-              Ton choix :{' '}
-              <span style={{ color: won ? '#a0ff70' : lost ? '#e05050' : '#c8880c', fontFamily: '"Cinzel", serif' }}>
-                {item.myVote.optionLabel}
-              </span>
-            </p>
+            <div className="mt-1.5 space-y-0.5">
+              <p className="text-xs" style={{ color: '#6b5010' }}>
+                {hasSecondVote ? 'Vote principal' : 'Ton choix'} :{' '}
+                <span style={{ color: voteColor, fontFamily: '"Cinzel", serif' }}>
+                  {item.myVote.optionLabel}
+                </span>
+              </p>
+              {hasSecondVote && (
+                <p className="text-xs" style={{ color: '#6b5010' }}>
+                  Second vote :{' '}
+                  <span style={{ color: '#a0a0f0', fontFamily: '"Cinzel", serif' }}>
+                    {item.myVote.secondOptionLabel}
+                  </span>
+                  {item.myVote.secondOptionId && won && (
+                    <span className="ml-1" style={{ color: '#a0ff70' }}>✦</span>
+                  )}
+                </p>
+              )}
+            </div>
           )}
 
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
+          {/* Badges de statut */}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span className="text-xs font-medium rounded-full px-2.5 py-0.5"
-              style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.color}44`, fontFamily: '"Cinzel", serif', fontSize: '0.65rem', letterSpacing: '0.06em' }}>
+              style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.color}44`, fontFamily: '"Cinzel", serif', fontSize: '0.65rem', letterSpacing: '0.04em' }}>
               {STATUS_LABELS[item.status] ?? item.status}
             </span>
             {item.isCreator && (
@@ -71,21 +90,35 @@ function HistoryCard({ item }: { item: HistoryItem }) {
                 Créateur
               </span>
             )}
+            {hasSecondVote && (
+              <span className="text-xs rounded-full px-2 py-0.5"
+                style={{ background: '#1a1a2e', border: '1px solid #4a4a8a44', color: '#8080d0', fontFamily: '"Cinzel", serif', fontSize: '0.65rem' }}>
+                Double vote
+              </span>
+            )}
             <span className="text-xs" style={{ color: '#3a2d10' }}>{item.participantCount} initiés</span>
-            <span className="text-xs" style={{ color: '#2a2218' }}>{new Date(item.createdAt).toLocaleDateString('fr-FR')}</span>
+            <span className="text-xs" style={{ color: '#2a2218' }}>
+              {new Date(item.createdAt).toLocaleDateString('fr-FR')}
+            </span>
           </div>
         </div>
 
-        <div className="flex-shrink-0 text-right">
+        {/* Score à droite */}
+        <div className="flex-shrink-0 text-right min-w-[40px]">
           {isResolved && item.myVote && (
             <>
-              <div className="text-lg font-black" style={{ color: won ? '#a0ff70' : '#e05050', fontFamily: '"Cinzel", serif' }}>
+              <p className="text-lg font-black" style={{ color: won ? '#a0ff70' : '#e05050', fontFamily: '"Cinzel", serif' }}>
                 {won ? `+${item.myVote.rewardPoints}` : '✗'}
-              </div>
+              </p>
               <p className="text-xs" style={{ color: '#3a2d10' }}>{won ? 'pts' : 'raté'}</p>
             </>
           )}
-          {!isResolved && <span className="text-xs" style={{ color: '#2a2218' }}>—</span>}
+          {isResolved && !item.myVote && (
+            <p className="text-xs" style={{ color: '#3a2d10' }}>Créé</p>
+          )}
+          {!isResolved && (
+            <span className="text-xs" style={{ color: '#2a2218' }}>—</span>
+          )}
         </div>
       </div>
     </Link>

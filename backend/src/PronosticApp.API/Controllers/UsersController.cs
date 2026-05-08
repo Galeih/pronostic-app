@@ -98,6 +98,7 @@ public class UsersController : ControllerBase
         // Pronostics créés ou auxquels l'utilisateur a participé
         var query = _db.Predictions
             .Include(p => p.Options)
+            // Include filtré : seul le vote de l'utilisateur courant (pour myVote)
             .Include(p => p.Votes.Where(v => v.UserId == CurrentUserId))
             .Where(p => p.CreatorId == CurrentUserId || votedIds.Contains(p.Id))
             .OrderByDescending(p => p.CreatedAt);
@@ -108,28 +109,43 @@ public class UsersController : ControllerBase
             .Take(pageSize)
             .ToListAsync();
 
+        // Compter les vrais participants (tous les votes, pas seulement ceux de l'utilisateur)
+        var predictionIds = items.Select(p => p.Id).ToList();
+        var realVoteCounts = await _db.Votes
+            .Where(v => predictionIds.Contains(v.PredictionId))
+            .GroupBy(v => v.PredictionId)
+            .Select(g => new { Id = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Id, x => x.Count);
+
         var result = items.Select(p =>
         {
-            var myVote  = p.Votes.FirstOrDefault();
+            var myVote    = p.Votes.FirstOrDefault();
             var isCreator = p.CreatorId == CurrentUserId;
+
+            // Libellé de la seconde option (double vote)
+            string? secondOptionLabel = null;
+            if (myVote?.SecondOptionId != null)
+                secondOptionLabel = p.Options.FirstOrDefault(o => o.Id == myVote.SecondOptionId)?.Label;
 
             return new
             {
-                id           = p.Id,
-                question     = p.Question,
-                status       = p.Status.ToString(),
-                shareCode    = p.ShareCode,
-                createdAt    = p.CreatedAt,
-                resolvedAt   = p.ResolvedAt,
-                participantCount = p.Votes.Count,
-                baseReward   = p.BaseReward,
+                id               = p.Id,
+                question         = p.Question,
+                status           = p.Status.ToString(),
+                shareCode        = p.ShareCode,
+                createdAt        = p.CreatedAt,
+                resolvedAt       = p.ResolvedAt,
+                participantCount = realVoteCounts.GetValueOrDefault(p.Id, 0),
+                baseReward       = p.BaseReward,
                 isCreator,
                 myVote = myVote == null ? null : new
                 {
-                    optionId     = myVote.OptionId,
-                    optionLabel  = p.Options.FirstOrDefault(o => o.Id == myVote.OptionId)?.Label,
-                    isCorrect    = myVote.IsCorrect,
-                    rewardPoints = myVote.RewardPoints,
+                    optionId          = myVote.OptionId,
+                    optionLabel       = p.Options.FirstOrDefault(o => o.Id == myVote.OptionId)?.Label,
+                    secondOptionId    = myVote.SecondOptionId,
+                    secondOptionLabel,
+                    isCorrect         = myVote.IsCorrect,
+                    rewardPoints      = myVote.RewardPoints,
                 },
             };
         });

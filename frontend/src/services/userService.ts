@@ -40,6 +40,8 @@ export interface HistoryItem {
   myVote?: {
     optionId: string
     optionLabel?: string
+    secondOptionId?: string
+    secondOptionLabel?: string
     isCorrect?: boolean
     rewardPoints: number
   }

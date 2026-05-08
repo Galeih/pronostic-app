@@ -3,13 +3,19 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { predictionService } from '../../services/predictionService'
 import { boostService }      from '../../services/boostService'
 import { useAuth } from '../../context/AuthContext'
-import type { Prediction, BoostCatalogItem } from '../../types'
+import type { Prediction, BoostCatalogItem, BoostUsageResponse } from '../../types'
 import BoostPanel from './BoostPanel'
 
 function useCountdown(targetDate: string | undefined) {
-  const calc = () => targetDate ? Math.max(0, new Date(targetDate).getTime() - Date.now()) : null
+  // Normalize: if no timezone indicator, treat as UTC (backend serializes without 'Z')
+  const normalize = (s: string) =>
+    s.endsWith('Z') || s.includes('+') || /[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z'
+  const calc = () => targetDate ? Math.max(0, new Date(normalize(targetDate)).getTime() - Date.now()) : null
   const [ms, setMs] = useState<number | null>(calc)
-  useEffect(() => { const id = setInterval(() => setMs(calc()), 1000); return () => clearInterval(id) })
+  useEffect(() => {
+    const id = setInterval(() => setMs(calc()), 1000)
+    return () => clearInterval(id)
+  }, [targetDate])
   if (ms === null) return { label: null, expired: false }
   if (ms === 0)    return { label: null, expired: true }
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
@@ -24,11 +30,12 @@ export default function WaitingPage() {
   const { shareCode } = useParams<{ shareCode: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [prediction, setPrediction] = useState<Prediction | null>(null)
-  const [catalog, setCatalog]       = useState<BoostCatalogItem[]>([])
-  const [isLoading, setIsLoading]   = useState(true)
-  const [error, setError]           = useState<string | null>(null)
-  const [copied, setCopied]         = useState(false)
+  const [prediction, setPrediction]   = useState<Prediction | null>(null)
+  const [catalog, setCatalog]         = useState<BoostCatalogItem[]>([])
+  const [boostUsages, setBoostUsages] = useState<BoostUsageResponse[]>([])
+  const [isLoading, setIsLoading]     = useState(true)
+  const [error, setError]             = useState<string | null>(null)
+  const [copied, setCopied]           = useState(false)
   const revealCountdown = useCountdown(prediction?.revealDate)
 
   const load = useCallback(async () => {
@@ -39,9 +46,10 @@ export default function WaitingPage() {
       if (p.status === 'Open' && !p.myVote) { navigate(`/p/${shareCode}/vote`, { replace: true }); return }
       setPrediction(p)
 
-      // Charger le catalogue de boosts si applicable
+      // Charger le catalogue et les usages de boosts si applicable
       if (p.allowBoosts && p.status === 'Open' && p.myVote) {
         boostService.getCatalog().then(setCatalog).catch(() => {})
+        boostService.getUsages(p.id).then(setBoostUsages).catch(() => {})
       }
     } catch { setError('Pronostic introuvable.') }
     finally { setIsLoading(false) }
@@ -82,12 +90,25 @@ export default function WaitingPage() {
     </div>
   )
 
-  const myVoteOption   = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
-  const mySecondOption = prediction.myVote?.secondOptionId ? prediction.options.find(o => o.id === prediction.myVote!.secondOptionId) : null
+  // Comparaison GUID insensible à la casse (le backend peut varier selon la config)
+  const findOption = (id?: string | null) =>
+    id ? prediction.options.find(o => o.id.toLowerCase() === id.toLowerCase()) : undefined
+
+  const myVoteOption   = prediction.myVote ? findOption(prediction.myVote.optionId) : null
+  const mySecondOption = prediction.myVote?.secondOptionId ? findOption(prediction.myVote.secondOptionId) : null
   const isCreator      = user?.id === prediction.creatorId
   const votesOpen      = prediction.status === 'Open'
   const votesClosed    = prediction.status === 'VoteClosed' || prediction.status === 'AwaitingResolution'
   const showBoosts     = votesOpen && !!prediction.myVote && prediction.allowBoosts && catalog.length > 0
+
+  // Bouclier actif : une entrée Shield déployée et non encore consommée par un sabotage
+  const hasActiveShield = boostUsages.some(u => u.boostType === 'Shield' && !u.wasBlocked)
+
+  // Rafraîchit catalog + usages après Shield / Sabotage (sans recharger la prediction entière)
+  const handleBoostUsed = useCallback(() => {
+    boostService.getCatalog().then(setCatalog).catch(() => {})
+    if (prediction) boostService.getUsages(prediction.id).then(setBoostUsages).catch(() => {})
+  }, [prediction])
 
   return (
     <div style={pageStyle} className="flex flex-col">
@@ -144,7 +165,20 @@ export default function WaitingPage() {
           <div className="relative p-5 rounded mb-5" style={{ background: '#161209', border: '1px solid #6b5010' }}>
             <span style={{ position:'absolute', top:6, left:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
             <span style={{ position:'absolute', top:6, right:6, color:'#c8880c', fontSize:'8px' }}>◆</span>
-            <p className="text-xs uppercase tracking-wide mb-2" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>Ta prophétie</p>
+
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs uppercase tracking-wide" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>Ta prophétie</p>
+              {/* Indicateur bouclier actif */}
+              {hasActiveShield && (
+                <span
+                  className="text-xs flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                  style={{ background: '#0a1828', border: '1px solid #2060a0', color: '#60b0ff', fontFamily: '"Cinzel", serif' }}
+                >
+                  🛡 Bouclier actif
+                </span>
+              )}
+            </div>
+
             <p className="text-lg font-bold mb-1" style={{ color: '#f0dfa8', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>« {prediction.question} »</p>
             <div className="mt-3 rounded px-4 py-3 flex items-center gap-3" style={{ background: '#1e1810', border: '1px solid #c8880c' }}>
               <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#c8880c' }} />
@@ -186,6 +220,7 @@ export default function WaitingPage() {
             prediction={prediction}
             catalog={catalog}
             onCorrectionApplied={load}
+            onBoostUsed={handleBoostUsed}
           />
         )}
 

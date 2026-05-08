@@ -89,6 +89,10 @@ export interface Prediction {
   participantCount?: number
   isCreator?: boolean
   myVote?: MyVote
+  /** Nombre de participants corrects (vote principal OU second vote). Dispo après résolution. */
+  winnerCount?: number
+  /** Total des points réellement distribués (après réductions). Dispo après résolution. */
+  totalPointsDistributed?: number
 }
 
 // Vote
@@ -181,6 +185,21 @@ export interface AuthResponse {
   token: string
   expiresAt: string
   user: User
+}
+
+// Boost usage (historique sur un pronostic)
+
+export interface BoostUsageResponse {
+  id: string
+  boostName: string
+  boostType: string
+  userId: string           // "***" si masqué (non créateur, non résolu)
+  userName: string         // "???" si masqué
+  targetUserId?: string | null
+  targetUserName?: string | null
+  usedAt: string
+  wasBlocked: boolean      // true = bouclier consommé ou sabotage bloqué
+  isRevealed: boolean
 }
 
 // API generique

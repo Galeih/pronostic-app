@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { boostService }      from '../../services/boostService'
 import { predictionService } from '../../services/predictionService'
+import { useToast }          from '../../context/ToastContext'
 import type { BoostCatalogItem, Prediction, PredictionOption } from '../../types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivePanel = 'none' | 'correction' | 'sabotage' | 'shield'
 type Voter       = { userId: string; userName: string }
-type Feedback    = { text: string; isError: boolean } | null
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function qty(catalog: BoostCatalogItem[], type: string) {
@@ -53,22 +53,25 @@ export default function BoostPanel({
   prediction,
   catalog,
   onCorrectionApplied,
+  onBoostUsed,
 }: {
   prediction: Prediction
   catalog: BoostCatalogItem[]
-  onCorrectionApplied: () => void   // rafraîchit la prediction parente
+  onCorrectionApplied: () => void   // rafraîchit la prediction parente (correction)
+  onBoostUsed: () => void           // rafraîchit catalog + usages (shield / sabotage)
 }) {
-  const [active, setActive]         = useState<ActivePanel>('none')
-  const [loading, setLoading]       = useState(false)
-  const [feedback, setFeedback]     = useState<Feedback>(null)
+  const { success, error: toastError } = useToast()
+
+  const [active, setActive]             = useState<ActivePanel>('none')
+  const [loading, setLoading]           = useState(false)
 
   // Correction
-  const [corrOption, setCorrOption] = useState<PredictionOption | null>(null)
+  const [corrOption, setCorrOption]     = useState<PredictionOption | null>(null)
 
   // Sabotage
-  const [voters, setVoters]         = useState<Voter[]>([])
+  const [voters, setVoters]             = useState<Voter[]>([])
   const [votersLoaded, setVotersLoaded] = useState(false)
-  const [sabTarget, setSabTarget]   = useState<Voter | null>(null)
+  const [sabTarget, setSabTarget]       = useState<Voter | null>(null)
 
   const currentOptionId = prediction.myVote?.optionId
   const options         = [...prediction.options].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -82,7 +85,6 @@ export default function BoostPanel({
   if (!hasCorrectionBoost && !hasSabotageBoost && !hasShieldBoost) return null
 
   const setPanel = async (panel: ActivePanel) => {
-    setFeedback(null)
     setCorrOption(null)
     setSabTarget(null)
 
@@ -97,7 +99,7 @@ export default function BoostPanel({
         setVoters(list)
         setVotersLoaded(true)
       } catch {
-        setFeedback({ text: 'Impossible de charger les adversaires.', isError: true })
+        toastError('Impossible de charger les adversaires.')
         setActive('none')
       } finally { setLoading(false) }
     }
@@ -105,40 +107,42 @@ export default function BoostPanel({
 
   const handleCorrection = async () => {
     if (!corrOption) return
-    setLoading(true); setFeedback(null)
+    setLoading(true)
     try {
       const res = await boostService.useCorrection(prediction.id, corrOption.id)
-      setFeedback({ text: res.message, isError: false })
+      success(res.message)
       setActive('none')
       onCorrectionApplied()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setFeedback({ text: msg ?? 'Erreur lors de la correction.', isError: true })
+      toastError(msg ?? 'Erreur lors de la correction.')
     } finally { setLoading(false) }
   }
 
   const handleSabotage = async () => {
     if (!sabTarget) return
-    setLoading(true); setFeedback(null)
+    setLoading(true)
     try {
       const res = await boostService.useSabotage(prediction.id, sabTarget.userId)
-      setFeedback({ text: res.message, isError: false })
+      res.wasBlocked ? toastError(res.message) : success(res.message)
       setActive('none')
+      onBoostUsed()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setFeedback({ text: msg ?? 'Erreur lors du sabotage.', isError: true })
+      toastError(msg ?? 'Erreur lors du sabotage.')
     } finally { setLoading(false) }
   }
 
   const handleShield = async () => {
-    setLoading(true); setFeedback(null)
+    setLoading(true)
     try {
       const res = await boostService.useShield(prediction.id)
-      setFeedback({ text: res.message, isError: false })
+      success(res.message)
       setActive('none')
+      onBoostUsed()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setFeedback({ text: msg ?? 'Erreur lors du déploiement.', isError: true })
+      toastError(msg ?? 'Erreur lors du déploiement du bouclier.')
     } finally { setLoading(false) }
   }
 
@@ -293,19 +297,7 @@ export default function BoostPanel({
         </div>
       )}
 
-      {/* Feedback */}
-      {feedback && (
-        <div
-          className="mx-4 mb-4 rounded px-4 py-3 text-sm"
-          style={{
-            background: feedback.isError ? '#2a0c0c' : '#0a1e0a',
-            border: `1px solid ${feedback.isError ? '#6b2020' : '#2a5a20'}`,
-            color:   feedback.isError ? '#e05050' : '#a0ff70',
-          }}
-        >
-          {feedback.text}
-        </div>
-      )}
+      {/* Les feedbacks passent maintenant par le système de toasts global */}
     </div>
   )
 }

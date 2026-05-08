@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { predictionService } from '../../services/predictionService'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth }  from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
 import type { Prediction, PredictionOption } from '../../types'
 
 const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
@@ -11,6 +12,7 @@ export default function ResultPage() {
   const { shareCode } = useParams<{ shareCode: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { error: toastError, success } = useToast()
 
   const [prediction, setPrediction]           = useState<Prediction | null>(null)
   const [isLoading, setIsLoading]             = useState(true)
@@ -39,8 +41,11 @@ export default function ResultPage() {
     try {
       const resolved = await predictionService.resolve(prediction.id, selectedCorrect.id)
       setPrediction(resolved)
+      success(`Verdict rendu : « ${selectedCorrect.label} » est la vérité.`)
     } catch (err: unknown) {
-      setResolveError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur.')
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur lors de la résolution.'
+      setResolveError(msg)
+      toastError(msg)
     } finally { setIsResolving(false) }
   }
 
@@ -65,11 +70,22 @@ export default function ResultPage() {
     </div>
   )
 
-  const isCreator     = user?.id === prediction.creatorId
-  const isResolved    = prediction.status === 'Resolved'
-  const sortedOptions = [...prediction.options].sort((a, b) => (b.votePercentage ?? 0) - (a.votePercentage ?? 0))
-  const myVoteOption  = prediction.myVote ? prediction.options.find(o => o.id === prediction.myVote!.optionId) : null
-  const iWon          = prediction.myVote?.isCorrect === true
+  const isCreator      = user?.id === prediction.creatorId
+  const isResolved     = prediction.status === 'Resolved'
+  const sortedOptions  = [...prediction.options].sort((a, b) => (b.votePercentage ?? 0) - (a.votePercentage ?? 0))
+
+  // Comparaison GUID insensible à la casse
+  const findOpt = (id?: string | null) =>
+    id ? prediction!.options.find(o => o.id.toLowerCase() === id.toLowerCase()) : undefined
+
+  const myVoteOption   = prediction.myVote ? findOpt(prediction.myVote.optionId) : null
+  const mySecondOption = prediction.myVote?.secondOptionId ? findOpt(prediction.myVote.secondOptionId) : null
+  const iWon           = prediction.myVote?.isCorrect === true
+
+  // Stats réelles après résolution
+  const gagnants         = prediction.winnerCount
+    ?? (prediction.options.find(o => o.id === prediction.correctOptionId)?.voteCount ?? 0)
+  const ptsDistribues    = prediction.totalPointsDistributed ?? prediction.baseReward
 
   // ── Vue créateur: choisir la bonne réponse ───────────────────
   if (isCreator && !isResolved) return (
@@ -191,11 +207,25 @@ export default function ResultPage() {
               {iWon ? 'Prophétie accomplie !' : 'Orakl en a décidé autrement'}
             </p>
             {iWon && <p className="font-bold text-lg" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>+{prediction.myVote.rewardPoints} pts</p>}
-            {myVoteOption && (
-              <p className="text-sm mt-2" style={{ color: '#6b5010' }}>
-                Tu avais choisi : <span style={{ color: '#f0dfa8', fontFamily: '"Cinzel", serif' }}>« {myVoteOption.label} »</span>
-              </p>
-            )}
+
+            {/* Vote(s) de l'utilisateur */}
+            <div className="mt-3 space-y-1">
+              {myVoteOption && (
+                <p className="text-sm" style={{ color: '#6b5010' }}>
+                  {mySecondOption ? 'Vote principal' : 'Tu avais choisi'} :{' '}
+                  <span style={{ color: '#f0dfa8', fontFamily: '"Cinzel", serif' }}>« {myVoteOption.label} »</span>
+                </p>
+              )}
+              {mySecondOption && (
+                <p className="text-sm" style={{ color: '#6b5010' }}>
+                  Second vote :{' '}
+                  <span style={{ color: '#a0a0f0', fontFamily: '"Cinzel", serif' }}>« {mySecondOption.label} »</span>
+                  {mySecondOption.id.toLowerCase() === prediction.correctOptionId?.toLowerCase() && (
+                    <span className="ml-1.5" style={{ color: '#a0ff70' }}>✦</span>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -218,23 +248,31 @@ export default function ResultPage() {
           </p>
           <div className="space-y-4">
             {sortedOptions.map(option => {
-              const isCorrect = option.id === prediction.correctOptionId
-              const isMyVote  = prediction.myVote?.optionId === option.id
-              const pct       = option.votePercentage ?? 0
+              const lid           = option.id.toLowerCase()
+              const isCorrect     = lid === prediction.correctOptionId?.toLowerCase()
+              const isMyPrimary   = lid === prediction.myVote?.optionId?.toLowerCase()
+              const isMySecondary = lid === prediction.myVote?.secondOptionId?.toLowerCase()
+              const pct           = option.votePercentage ?? 0
               return (
                 <div key={option.id}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      {isCorrect  && <span style={{ color: '#a0ff70' }}>✦</span>}
-                      {isMyVote && !isCorrect && <span style={{ color: '#e05050' }}>✗</span>}
-                      <span className="text-sm font-semibold" style={{
-                        color: isCorrect ? '#a0ff70' : isMyVote ? '#8a6060' : '#9a8a64',
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isCorrect && <span style={{ color: '#a0ff70' }}>✦</span>}
+                      {isMyPrimary && !isCorrect && <span style={{ color: '#e05050' }}>✗</span>}
+                      <span className="text-sm font-semibold truncate" style={{
+                        color: isCorrect ? '#a0ff70' : isMyPrimary ? '#8a6060' : '#9a8a64',
                         fontFamily: '"Cinzel", serif',
                       }}>
                         {option.label}
                       </span>
+                      {/* Badge second vote */}
+                      {isMySecondary && !isMyPrimary && (
+                        <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded" style={{
+                          background: '#1a1a2e', border: '1px solid #4a4a8a', color: '#a0a0f0',
+                        }}>2ᵉ</span>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div className="flex-shrink-0 text-right ml-2">
                       <span className="text-sm font-bold" style={{ color: isCorrect ? '#a0ff70' : '#6b5010' }}>{pct}%</span>
                       <span className="text-xs ml-1" style={{ color: '#3a2d10' }}>({option.voteCount ?? 0})</span>
                     </div>
@@ -242,7 +280,7 @@ export default function ResultPage() {
                   <div className="h-2 rounded-full overflow-hidden" style={{ background: '#0e0c08' }}>
                     <div
                       className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${pct}%`, background: isCorrect ? 'linear-gradient(to right, #3a8a20, #a0ff70)' : isMyVote ? '#4a2020' : '#3a2d10' }}
+                      style={{ width: `${pct}%`, background: isCorrect ? 'linear-gradient(to right, #3a8a20, #a0ff70)' : isMyPrimary ? '#4a2020' : '#3a2d10' }}
                     />
                   </div>
                 </div>
@@ -253,8 +291,8 @@ export default function ResultPage() {
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           {[
-            { label: 'pts distribués', val: prediction.baseReward },
-            { label: 'gagnants', val: prediction.options.find(o => o.id === prediction.correctOptionId)?.voteCount ?? 0 },
+            { label: 'pts distribués', val: ptsDistribues },
+            { label: 'gagnants',       val: gagnants },
           ].map(s => (
             <div key={s.label} className="rounded p-4 text-center" style={cardStyle}>
               <p className="text-2xl font-black" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>{s.val}</p>

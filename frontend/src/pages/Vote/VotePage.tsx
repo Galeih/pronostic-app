@@ -3,12 +3,19 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { predictionService } from '../../services/predictionService'
 import { boostService }      from '../../services/boostService'
 import { useAuth }           from '../../context/AuthContext'
+import { useToast }          from '../../context/ToastContext'
 import type { Prediction, PredictionOption } from '../../types'
 
 function useCountdown(deadline: string) {
-  const calc = () => Math.max(0, new Date(deadline).getTime() - Date.now())
+  // Normalize: if no timezone indicator, treat as UTC (backend serializes without 'Z')
+  const normalize = (s: string) =>
+    s.endsWith('Z') || s.includes('+') || /[+-]\d{2}:\d{2}$/.test(s) ? s : s + 'Z'
+  const calc = () => Math.max(0, new Date(normalize(deadline)).getTime() - Date.now())
   const [ms, setMs] = useState(calc)
-  useEffect(() => { const id = setInterval(() => setMs(calc()), 1000); return () => clearInterval(id) })
+  useEffect(() => {
+    const id = setInterval(() => setMs(calc()), 1000)
+    return () => clearInterval(id)
+  }, [deadline])
   const s = Math.floor(ms / 1000)
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
   return {
@@ -24,6 +31,7 @@ export default function VotePage() {
   const { shareCode }       = useParams<{ shareCode: string }>()
   const navigate            = useNavigate()
   const { isAuthenticated } = useAuth()
+  const { error: toastError, info } = useToast()
 
   const [prediction, setPrediction]         = useState<Prediction | null>(null)
   const [selected, setSelected]             = useState<PredictionOption | null>(null)
@@ -83,9 +91,12 @@ export default function VotePage() {
         : selected.label
       setVotedLabel(label)
       setVoted(true)
+      info('Prophétie scellée ! Redirection en cours…')
       setTimeout(() => navigate(`/p/${shareCode}/waiting`), 2000)
     } catch (err: unknown) {
-      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur.')
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur lors du vote.'
+      setError(msg)
+      toastError(msg)
     } finally { setIsSubmitting(false) }
   }
 

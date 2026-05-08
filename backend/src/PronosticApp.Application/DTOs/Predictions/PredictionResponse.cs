@@ -45,6 +45,18 @@ public class PredictionResponse
 
     /// <summary>Indique si l'utilisateur connecté est le créateur.</summary>
     public bool IsCreator { get; set; }
+
+    /// <summary>
+    /// Nombre de participants avec IsCorrect = true (vote principal OU second vote).
+    /// Disponible uniquement après résolution.
+    /// </summary>
+    public int? WinnerCount { get; set; }
+
+    /// <summary>
+    /// Somme des RewardPoints de tous les votes après résolution.
+    /// Tient compte des réductions (double vote -40 %, sabotages, etc.).
+    /// </summary>
+    public int? TotalPointsDistributed { get; set; }
 }
 
 public class OptionResponse

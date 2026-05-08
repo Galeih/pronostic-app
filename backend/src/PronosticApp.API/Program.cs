@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using PronosticApp.API.Json;
 using PronosticApp.Application.Interfaces;
 using PronosticApp.Domain.Entities;
 using PronosticApp.Infrastructure.Data;
@@ -93,6 +94,11 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter()
         );
+        // Force DateTime/DateTime? à être sérialisés avec suffixe 'Z' (UTC).
+        // SQLite + EF Core renvoie DateTimeKind.Unspecified, ce qui ferait
+        // interpréter les dates comme heure locale côté navigateur.
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
