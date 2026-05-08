@@ -51,7 +51,7 @@ const STATUS_COLORS: Record<string, { color: string; label: string }> = {
 function MiniCard({ item, action }: { item: HistoryItem; action?: React.ReactNode }) {
   const sc   = STATUS_COLORS[item.status] ?? STATUS_COLORS.Draft
   const won  = item.myVote?.isCorrect === true
-  const lost = item.myVote?.isCorrect === false
+  // const lost = item.myVote?.isCorrect === false
 
   return (
     <Link
@@ -98,7 +98,7 @@ function ActionCard({ item }: { item: HistoryItem }) {
   const navigate = useNavigate()
   const needsReveal = item.isCreator &&
     (item.status === 'VoteClosed' || item.status === 'AwaitingResolution')
-  const needsVote = !item.myVote && item.status === 'Open'
+  // const needsVote = !item.myVote && item.status === 'Open'
 
   return (
     <div className="rounded p-4 flex items-start justify-between gap-3"
