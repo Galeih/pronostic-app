@@ -291,7 +291,7 @@ export default function ChannelPage() {
     setShowSharePicker(true)
     if (myPredictions.length === 0) {
       try {
-        const all = await predictionService.getAll()
+        const all = await predictionService.getMyPredictions()
         setMyPredictions(all)
       } catch { /* ignore */ }
     }

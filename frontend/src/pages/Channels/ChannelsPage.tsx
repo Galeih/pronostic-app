@@ -18,14 +18,6 @@ function timeAgo(iso: string): string {
   return `il y a ${Math.floor(h / 24)}j`
 }
 
-function avatarGradient(level: number): string {
-  if (level >= 20) return 'linear-gradient(135deg, #7b2ff7, #c84fff)'
-  if (level >= 12) return 'linear-gradient(135deg, #b8860b, #f5c842)'
-  if (level >= 8)  return 'linear-gradient(135deg, #1a6b3a, #3aaa60)'
-  if (level >= 5)  return 'linear-gradient(135deg, #1a4a6b, #3a80c8)'
-  return 'linear-gradient(135deg, #3a2d10, #6b5010)'
-}
-
 // ── Carte channel ─────────────────────────────────────────────────────────────
 
 function ChannelCard({ channel }: { channel: Channel }) {
@@ -93,7 +85,7 @@ function ChannelCard({ channel }: { channel: Channel }) {
 export default function ChannelsPage() {
   usePageTitle('Cercles')
   const navigate = useNavigate()
-  const { user } = useAuth()
+  useAuth()
   const { success, error: toastError } = useToast()
 
   const [channels, setChannels]     = useState<Channel[]>([])

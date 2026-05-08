@@ -4,9 +4,6 @@ import Navbar from '../../components/layout/Navbar'
 import { useAuth } from '../../context/AuthContext'
 import { usePageTitle } from '../../hooks/usePageTitle'
 
-// Symboles mystiques qui apparaissent en fondu
-const GLYPHS = ['✦', '◈', '◆', '⚖', '🔮', '◉', '✧', '⬡']
-
 function FloatingGlyph({ glyph, style }: { glyph: string; style: React.CSSProperties }) {
   return (
     <span className="absolute select-none pointer-events-none" style={{ ...style, fontFamily: '"Cinzel", serif' }}>

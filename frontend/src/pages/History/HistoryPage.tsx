@@ -41,6 +41,7 @@ function targetPath(shareCode: string, status: string, hasVoted: boolean): strin
 }
 
 function HistoryCard({ item }: { item: HistoryItem }) {
+  const isResolved   = item.status === 'Resolved'
   const won          = item.myVote?.isCorrect === true
   const lost         = item.myVote?.isCorrect === false
   const hasSecondVote = !!item.myVote?.secondOptionLabel
