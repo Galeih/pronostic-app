@@ -88,4 +88,13 @@ export const userService = {
     const res = await api.get<LeaderboardResponse>('/leaderboard', { params: { top } })
     return res.data
   },
+
+  async updateProfile(userName: string): Promise<{ userName: string }> {
+    const res = await api.put<{ userName: string }>('/users/me', { userName })
+    return res.data
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api.post('/users/me/change-password', { currentPassword, newPassword })
+  },
 }

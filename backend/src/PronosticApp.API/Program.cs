@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using PronosticApp.API.Hubs;
 using PronosticApp.API.Json;
 using PronosticApp.Application.Interfaces;
 using PronosticApp.Domain.Entities;
@@ -69,6 +70,22 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
+
+    // SignalR transmet le token JWT via query string (?access_token=...)
+    // car les WebSockets ne supportent pas les en-têtes Authorization.
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 // ─── CORS ──────────────────────────────────────────────────────────────────
@@ -85,6 +102,9 @@ builder.Services.AddCors(options =>
 
 // ─── Services applicatifs ──────────────────────────────────────────────────
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
+
+// ─── SignalR ───────────────────────────────────────────────────────────────
+builder.Services.AddSignalR();
 
 // ─── Controllers + Swagger ─────────────────────────────────────────────────
 builder.Services.AddControllers()
@@ -189,6 +209,7 @@ app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
 
@@ -211,6 +232,13 @@ static async Task<bool> IsSqliteSchemaUpToDateAsync(AppDbContext db)
             return (long)(await cmd.ExecuteScalarAsync())! > 0;
         }
 
+        async Task<bool> TableExists(string table)
+        {
+            using var cmd2 = conn.CreateCommand();
+            cmd2.CommandText = $"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table}'";
+            return (long)(await cmd2.ExecuteScalarAsync())! > 0;
+        }
+
         // Colonnes ajoutées au modèle après la création initiale de la base
         var checks = new[]
         {
@@ -218,6 +246,8 @@ static async Task<bool> IsSqliteSchemaUpToDateAsync(AppDbContext db)
             await HasColumn("Votes",       "SecondOptionId"),
             await HasColumn("Votes",       "IsSecondVote"),
             await HasColumn("Votes",       "UsedCorrectionBoost"),
+            // Channels (SignalR)
+            await TableExists("Messages"),
         };
 
         return checks.All(ok => ok);

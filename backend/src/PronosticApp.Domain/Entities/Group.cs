@@ -23,4 +23,5 @@ public class Group
     // Navigation
     public ICollection<GroupMember> Members { get; set; } = new List<GroupMember>();
     public ICollection<Prediction> Predictions { get; set; } = new List<Prediction>();
+    public ICollection<Message> Messages { get; set; } = new List<Message>();
 }

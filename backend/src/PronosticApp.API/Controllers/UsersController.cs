@@ -6,6 +6,7 @@ using PronosticApp.Application.DTOs.Users;
 using PronosticApp.Domain.Entities;
 using PronosticApp.Infrastructure.Data;
 using System.Security.Claims;
+using PronosticApp.Application.DTOs.Auth;
 
 namespace PronosticApp.API.Controllers;
 
@@ -151,6 +152,63 @@ public class UsersController : ControllerBase
         });
 
         return Ok(new { total, page, pageSize, items = result });
+    }
+
+    // ─── PUT /api/users/me ────────────────────────────────────────────────
+    /// <summary>Modifier le pseudo de l'utilisateur connecté.</summary>
+    [HttpPut("me")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var userName = request.UserName?.Trim();
+        if (string.IsNullOrWhiteSpace(userName) || userName.Length < 3 || userName.Length > 30)
+            return BadRequest(new { message = "Le pseudonyme doit faire entre 3 et 30 caractères." });
+
+        var user = await _userManager.FindByIdAsync(CurrentUserId);
+        if (user == null) return NotFound();
+
+        // Vérifier unicité
+        var existing = await _userManager.FindByNameAsync(userName);
+        if (existing != null && existing.Id != user.Id)
+            return BadRequest(new { message = "Ce pseudonyme est déjà utilisé." });
+
+        user.UserName = userName;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            var msg = result.Errors.FirstOrDefault()?.Description ?? "Erreur lors de la mise à jour.";
+            return BadRequest(new { message = msg });
+        }
+
+        return Ok(new { message = "Profil mis à jour.", userName = user.UserName });
+    }
+
+    // ─── POST /api/users/me/change-password ───────────────────────────────
+    /// <summary>Changer le mot de passe (nécessite l'ancien).</summary>
+    [HttpPost("me/change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(request.NewPassword))
+            return BadRequest(new { message = "Tous les champs sont obligatoires." });
+
+        if (request.NewPassword.Length < 8)
+            return BadRequest(new { message = "Le nouveau mot de passe doit faire au moins 8 caractères." });
+
+        var user = await _userManager.FindByIdAsync(CurrentUserId);
+        if (user == null) return NotFound();
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var msg = result.Errors.FirstOrDefault()?.Description
+                ?? "Mot de passe actuel incorrect.";
+            // Message plus clair pour l'erreur la plus courante
+            if (msg.Contains("Incorrect") || msg.Contains("incorrect"))
+                msg = "Mot de passe actuel incorrect.";
+            return BadRequest(new { message = msg });
+        }
+
+        return Ok(new { message = "Mot de passe modifié avec succès." });
     }
 
     // ─── GET /api/leaderboard ──────────────────────────────────────────────

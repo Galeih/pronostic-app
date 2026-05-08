@@ -4,6 +4,7 @@ import { predictionService } from '../../services/predictionService'
 import { useAuth } from '../../context/AuthContext'
 import Navbar from '../../components/layout/Navbar'
 import type { Prediction } from '../../types'
+import { usePageTitle } from '../../hooks/usePageTitle'
 
 const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
 
@@ -53,6 +54,37 @@ export default function PredictionDetailPage() {
   const [error, setError]           = useState<string | null>(null)
   const [copied, setCopied]         = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+
+  usePageTitle(prediction ? prediction.question : 'Pronostic')
+
+  // ── Open Graph meta tags ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!prediction) return
+    const url = window.location.href
+    const title = `Orakl — ${prediction.question}`
+    const desc = `Rejoins le pronostic et vote avant la deadline ! ${prediction.options?.map(o => o.label).join(' · ')}`
+
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`)
+      if (!el) {
+        el = document.createElement('meta')
+        el.setAttribute('property', property)
+        document.head.appendChild(el)
+      }
+      el.setAttribute('content', content)
+    }
+
+    setMeta('og:title',       title)
+    setMeta('og:description', desc)
+    setMeta('og:url',         url)
+    setMeta('og:type',        'website')
+
+    return () => {
+      ;['og:title', 'og:description', 'og:url', 'og:type'].forEach(p => {
+        document.querySelector(`meta[property="${p}"]`)?.remove()
+      })
+    }
+  }, [prediction])
 
   useEffect(() => {
     if (!shareCode) return

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { userService, type HistoryItem } from '../../services/userService'
 import Navbar from '../../components/layout/Navbar'
+import { usePageTitle } from '../../hooks/usePageTitle'
+import { SkeletonCard } from '../../components/ui/SkeletonCard'
 
 const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
 
@@ -27,9 +29,18 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   Cancelled:          { bg: '#1a0808', color: '#e05050' },
 }
 
+/** Retourne le sous-chemin approprié selon le statut du pronostic */
+function targetPath(shareCode: string, status: string, hasVoted: boolean): string {
+  switch (status) {
+    case 'Resolved':           return `/p/${shareCode}/result`
+    case 'VoteClosed':
+    case 'AwaitingResolution': return `/p/${shareCode}/waiting`
+    case 'Open':               return hasVoted ? `/p/${shareCode}/waiting` : `/p/${shareCode}/vote`
+    default:                   return `/p/${shareCode}`  // Draft, Cancelled, Archived
+  }
+}
+
 function HistoryCard({ item }: { item: HistoryItem }) {
-  const isResolved   = item.status === 'Resolved'
-  const isPending    = !isResolved && item.status !== 'Cancelled'
   const won          = item.myVote?.isCorrect === true
   const lost         = item.myVote?.isCorrect === false
   const hasSecondVote = !!item.myVote?.secondOptionLabel
@@ -40,7 +51,7 @@ function HistoryCard({ item }: { item: HistoryItem }) {
 
   return (
     <Link
-      to={`/p/${item.shareCode}${isResolved ? '/result' : isPending ? '/waiting' : ''}`}
+      to={targetPath(item.shareCode, item.status, !!item.myVote)}
       className="block p-4 rounded transition"
       style={{ background: '#161209', border: '1px solid #3a2d10' }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#6b5010')}
@@ -126,6 +137,7 @@ function HistoryCard({ item }: { item: HistoryItem }) {
 }
 
 export default function HistoryPage() {
+  usePageTitle('Archives')
   const [items, setItems]       = useState<HistoryItem[]>([])
   const [total, setTotal]       = useState(0)
   const [page, setPage]         = useState(1)
@@ -213,9 +225,8 @@ export default function HistoryPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => <SkeletonCard key={i} lines={2} />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">

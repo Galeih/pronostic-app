@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { usePageTitle } from '../../hooks/usePageTitle'
 import { useNavigate } from 'react-router-dom'
 import { predictionService } from '../../services/predictionService'
+import { useToast } from '../../context/ToastContext'
 import Navbar from '../../components/layout/Navbar'
 
 interface OptionDraft {
@@ -41,8 +43,36 @@ const labelStyle = {
   letterSpacing: '0.08em',
 }
 
+// ─── Presets deadline ─────────────────────────────────────────────────────────
+
+const DEADLINE_PRESETS = [
+  { label: '1 h',  ms: 60 * 60 * 1000 },
+  { label: '6 h',  ms: 6 * 60 * 60 * 1000 },
+  { label: '24 h', ms: 24 * 60 * 60 * 1000 },
+  { label: '3 j',  ms: 3 * 24 * 60 * 60 * 1000 },
+  { label: '7 j',  ms: 7 * 24 * 60 * 60 * 1000 },
+]
+
+function toLocalDatetimeString(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// ─── Templates d'options ──────────────────────────────────────────────────────
+
+const OPTION_TEMPLATES = [
+  { label: 'Oui / Non',        options: ['Oui', 'Non'] },
+  { label: 'Vrai / Faux',      options: ['Vrai', 'Faux'] },
+  { label: '+tôt / +tard',     options: ['Plus tôt que prévu', 'Plus tard que prévu'] },
+  { label: 'Équipes A / B',    options: ['Équipe A', 'Équipe B'] },
+]
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function CreatePredictionPage() {
+  usePageTitle('Nouveau pronostic')
   const navigate = useNavigate()
+  const { error: toastError } = useToast()
 
   const [step, setStep]           = useState<Step>('question')
   const [question, setQuestion]   = useState('')
@@ -51,12 +81,13 @@ export default function CreatePredictionPage() {
     { id: crypto.randomUUID(), label: '', description: '' },
     { id: crypto.randomUUID(), label: '', description: '' },
   ])
-  const [voteDeadline, setVoteDeadline] = useState('')
-  const [revealDate, setRevealDate]     = useState('')
-  const [allowBoosts, setAllowBoosts]   = useState(true)
+  const [voteDeadline, setVoteDeadline]   = useState('')
+  const [revealDate, setRevealDate]       = useState('')
+  const [allowBoosts, setAllowBoosts]     = useState(true)
   const [allowSabotage, setAllowSabotage] = useState(true)
-  const [isAnonymous, setIsAnonymous]   = useState(false)
-  const [baseReward, setBaseReward]     = useState(100)
+  const [isAnonymous, setIsAnonymous]     = useState(false)
+  const [baseReward, setBaseReward]       = useState(100)
+  const [customReward, setCustomReward]   = useState('')
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError]         = useState<string | null>(null)
@@ -72,11 +103,35 @@ export default function CreatePredictionPage() {
 
   const goNext = () => { if (!canGoNext()) return; const next = STEPS[stepIndex + 1]; if (next) setStep(next) }
   const goPrev = () => { const prev = STEPS[stepIndex - 1]; if (prev) setStep(prev) }
-  const addOption = () => { if (options.length >= 10) return; setOptions(prev => [...prev, { id: crypto.randomUUID(), label: '', description: '' }]) }
-  const removeOption = (id: string) => { if (options.length <= 2) return; setOptions(prev => prev.filter(o => o.id !== id)) }
+
+  const addOption = () => {
+    if (options.length >= 10) return
+    setOptions(prev => [...prev, { id: crypto.randomUUID(), label: '', description: '' }])
+  }
+  const removeOption = (id: string) => {
+    if (options.length <= 2) return
+    setOptions(prev => prev.filter(o => o.id !== id))
+  }
   const updateOption = (id: string, field: keyof OptionDraft, value: string) => {
     setOptions(prev => prev.map(o => o.id === id ? { ...o, [field]: value } : o))
   }
+  const applyTemplate = (tpl: { options: string[] }) => {
+    setOptions(tpl.options.map(label => ({ id: crypto.randomUUID(), label, description: '' })))
+  }
+
+  const applyDeadlinePreset = (ms: number) => {
+    setVoteDeadline(toLocalDatetimeString(new Date(Date.now() + ms)))
+  }
+
+  const handleCustomReward = (v: string) => {
+    setCustomReward(v)
+    const n = parseInt(v)
+    if (!isNaN(n) && n > 0) setBaseReward(n)
+  }
+
+  const effectiveReward = customReward
+    ? (parseInt(customReward) || baseReward)
+    : baseReward
 
   const handleSubmit = async (publish: boolean) => {
     setError(null)
@@ -91,7 +146,8 @@ export default function CreatePredictionPage() {
         options:      filledOptions as never,
         voteDeadline: new Date(voteDeadline).toISOString(),
         revealDate:   revealDate ? new Date(revealDate).toISOString() : undefined,
-        allowBoosts, allowSabotage, isAnonymous, baseReward,
+        allowBoosts, allowSabotage, isAnonymous,
+        baseReward:   effectiveReward,
       })
       if (publish) {
         const published = await predictionService.publish(prediction.id)
@@ -102,83 +158,73 @@ export default function CreatePredictionPage() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Une erreur est survenue.'
       setError(msg)
+      toastError(msg)
     } finally {
       setIsLoading(false)
     }
   }
+
+  const filledOptions = options.filter(o => o.label.trim())
 
   return (
     <div className="min-h-screen" style={{ background: '#0e0c08', color: '#f0dfa8' }}>
       <Navbar />
       <div className="max-w-2xl mx-auto px-4 py-10">
 
-        {/* Header */}
+        {/* ── En-tête ── */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate('/')}
+          <button onClick={() => navigate('/')}
             className="text-sm flex items-center gap-1 mb-4 transition"
             style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#c8880c')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}
-          >
+            onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}>
             ← Retour
           </button>
-          <h1 className="text-3xl font-extrabold" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
+          <h1 className="text-3xl font-extrabold"
+            style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f5c842' }}>
             Invoquer un Pronostic
           </h1>
-          <p className="text-sm mt-1" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+          <p className="text-sm mt-1"
+            style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
             Pose une question. Convoque tes amis. Révèle la vérité.
           </p>
         </div>
 
-        {/* Steps */}
+        {/* ── Indicateur d'étapes ── */}
         <div className="flex items-center gap-2 mb-8">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div className="flex items-center gap-2">
-                <div
-                  className="w-7 h-7 rounded flex items-center justify-center text-xs font-bold transition"
+                <div className="w-7 h-7 rounded flex items-center justify-center text-xs font-bold transition"
                   style={{
                     fontFamily: '"Cinzel", serif',
                     border: `2px solid ${i < stepIndex ? '#c8880c' : i === stepIndex ? '#f5c842' : '#3a2d10'}`,
                     background: i < stepIndex ? '#c8880c' : '#0e0c08',
                     color: i < stepIndex ? '#0e0c08' : i === stepIndex ? '#f5c842' : '#3a2d10',
-                  }}
-                >
+                  }}>
                   {i < stepIndex ? '✓' : i + 1}
                 </div>
-                <span
-                  className="text-xs font-medium hidden sm:block"
-                  style={{
-                    fontFamily: '"Cinzel", serif',
-                    color: i <= stepIndex ? '#c8880c' : '#3a2d10',
-                    letterSpacing: '0.06em',
-                  }}
-                >
+                <span className="text-xs font-medium hidden sm:block"
+                  style={{ fontFamily: '"Cinzel", serif', color: i <= stepIndex ? '#c8880c' : '#3a2d10', letterSpacing: '0.06em' }}>
                   {STEP_LABELS[s]}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <div
-                  className="flex-1"
-                  style={{ height:'1px', background: i < stepIndex ? '#c8880c' : '#2a2218' }}
-                />
+                <div className="flex-1" style={{ height: '1px', background: i < stepIndex ? '#c8880c' : '#2a2218' }} />
               )}
             </div>
           ))}
         </div>
 
-        {/* Card */}
-        <div
-          className="relative p-6 rounded shadow-2xl"
-          style={{ background: '#161209', border: '1px solid #6b5010' }}
-        >
-          <span style={{ position:'absolute', top:8, left:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
-          <span style={{ position:'absolute', top:8, right:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
-          <span style={{ position:'absolute', bottom:8, left:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
-          <span style={{ position:'absolute', bottom:8, right:8, color:'#c8880c', fontSize:'10px' }}>◆</span>
+        {/* ── Carte principale ── */}
+        <div className="relative p-6 rounded shadow-2xl"
+          style={{ background: '#161209', border: '1px solid #6b5010' }}>
+          <span style={{ position: 'absolute', top: 8, left: 8,   color: '#c8880c', fontSize: '10px' }}>◆</span>
+          <span style={{ position: 'absolute', top: 8, right: 8,  color: '#c8880c', fontSize: '10px' }}>◆</span>
+          <span style={{ position: 'absolute', bottom: 8, left: 8,  color: '#c8880c', fontSize: '10px' }}>◆</span>
+          <span style={{ position: 'absolute', bottom: 8, right: 8, color: '#c8880c', fontSize: '10px' }}>◆</span>
 
-          {/* STEP: question */}
+          {/* ══ ÉTAPE 1 : Question ══ */}
           {step === 'question' && (
             <div className="space-y-5">
               <div>
@@ -193,11 +239,15 @@ export default function CreatePredictionPage() {
                   onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
                 />
-                <p className="text-xs mt-1 text-right" style={{ color: '#3a2d10' }}>{question.length}/500</p>
+                <p className="text-xs mt-1 text-right" style={{ color: '#3a2d10' }}>
+                  {question.length}/500
+                </p>
               </div>
 
               <div>
-                <label style={labelStyle}>Contexte <span style={{ color:'#3a2d10', fontFamily:'inherit', fontWeight:400 }}>(facultatif)</span></label>
+                <label style={labelStyle}>
+                  Contexte <span style={{ color: '#3a2d10', fontFamily: 'inherit', fontWeight: 400 }}>(facultatif)</span>
+                </label>
                 <textarea
                   value={context}
                   onChange={e => setContext(e.target.value)}
@@ -210,8 +260,25 @@ export default function CreatePredictionPage() {
                 />
               </div>
 
-              <div className="rounded p-4" style={{ background:'#0e0c08', border:'1px solid #2a2218' }}>
-                <p className="text-xs mb-2 font-medium" style={{ color:'#6b5010', fontFamily:'"Cinzel", serif' }}>
+              {/* Aperçu live */}
+              {question.trim().length >= 5 && (
+                <div className="rounded p-4" style={{ background: '#0e0c08', border: '1px solid #2a2218' }}>
+                  <p className="text-xs mb-2" style={{ color: '#3a2d10', fontFamily: '"Cinzel", serif' }}>
+                    ✦ Aperçu
+                  </p>
+                  <p className="text-sm font-semibold italic leading-snug"
+                    style={{ color: '#c8a060', fontFamily: '"Lora", serif' }}>
+                    « {question.trim()} »
+                  </p>
+                  {context.trim() && (
+                    <p className="text-xs mt-1.5 italic" style={{ color: '#6b5010' }}>{context.trim()}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Inspirations */}
+              <div className="rounded p-4" style={{ background: '#0e0c08', border: '1px solid #2a2218' }}>
+                <p className="text-xs mb-2 font-medium" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
                   ✦ Inspiration oraculaire
                 </p>
                 {[
@@ -219,14 +286,11 @@ export default function CreatePredictionPage() {
                   "Qui va finir son assiette en premier ?",
                   "Est-ce que le film va être nul ?",
                 ].map(ex => (
-                  <button
-                    key={ex}
-                    onClick={() => setQuestion(ex)}
+                  <button key={ex} onClick={() => setQuestion(ex)}
                     className="block text-xs py-0.5 text-left transition"
-                    style={{ color:'#6b5010', fontStyle:'italic' }}
+                    style={{ color: '#6b5010', fontStyle: 'italic' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#c8880c')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}
-                  >
+                    onMouseLeave={e => (e.currentTarget.style.color = '#6b5010')}>
                     « {ex} »
                   </button>
                 ))}
@@ -234,22 +298,35 @@ export default function CreatePredictionPage() {
             </div>
           )}
 
-          {/* STEP: options */}
+          {/* ══ ÉTAPE 2 : Options ══ */}
           {step === 'options' && (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-semibold mb-1" style={{ fontFamily:'"Cinzel", serif', color:'#f0dfa8' }}>
+                <p className="text-sm font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>
                   Les possibles ✦
                 </p>
-                <p className="text-xs mb-4" style={{ color:'#6b5010' }}>Minimum 2, maximum 10 chemins vers la vérité.</p>
+                <p className="text-xs mb-3" style={{ color: '#6b5010' }}>
+                  Minimum 2, maximum 10 chemins vers la vérité.
+                </p>
+
+                {/* Templates rapides */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {OPTION_TEMPLATES.map(tpl => (
+                    <button key={tpl.label} onClick={() => applyTemplate(tpl)}
+                      className="text-xs px-3 py-1.5 rounded-full transition"
+                      style={{ background: '#0e0c08', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#c8880c'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}>
+                      {tpl.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {options.map((opt, index) => (
-                <div key={opt.id} className="flex gap-3 items-start group">
-                  <div
-                    className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs mt-2.5 font-bold"
-                    style={{ background:'#0e0c08', border:'1px solid #6b5010', color:'#c8880c', fontFamily:'"Cinzel", serif' }}
-                  >
+                <div key={opt.id} className="flex gap-3 items-start">
+                  <div className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs mt-2.5 font-bold"
+                    style={{ background: '#0e0c08', border: '1px solid #6b5010', color: '#c8880c', fontFamily: '"Cinzel", serif' }}>
                     {index + 1}
                   </div>
                   <div className="flex-1 space-y-1.5">
@@ -269,225 +346,270 @@ export default function CreatePredictionPage() {
                       onChange={e => updateOption(opt.id, 'description', e.target.value)}
                       placeholder="Description (facultatif)"
                       maxLength={300}
-                      style={{ ...inputStyle, background:'#0a0906', fontSize:'0.75rem', padding:'6px 12px' }}
+                      style={{ ...inputStyle, background: '#0a0906', fontSize: '0.75rem', padding: '6px 12px' }}
                       onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
                       onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
                     />
                   </div>
-                  <button
-                    onClick={() => removeOption(opt.id)}
+                  <button onClick={() => removeOption(opt.id)}
                     disabled={options.length <= 2}
                     className="mt-2.5 transition text-lg leading-none"
-                    style={{ color:'#3a2d10' }}
-                    onMouseEnter={e => !e.currentTarget.disabled && ((e.currentTarget as HTMLElement).style.color = '#c84040')}
-                    onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#3a2d10')}
-                  >
+                    style={{ color: '#3a2d10', background: 'none', border: 'none', cursor: options.length <= 2 ? 'not-allowed' : 'pointer' }}
+                    onMouseEnter={e => { if (options.length > 2) (e.currentTarget as HTMLElement).style.color = '#c84040' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#3a2d10' }}>
                     ×
                   </button>
                 </div>
               ))}
 
               {options.length < 10 && (
-                <button
-                  onClick={addOption}
+                <button onClick={addOption}
                   className="w-full py-3 text-sm transition flex items-center justify-center gap-2"
-                  style={{
-                    border:'2px dashed #3a2d10',
-                    borderRadius:'4px',
-                    color:'#6b5010',
-                    fontFamily:'"Cinzel", serif',
-                    fontSize:'0.75rem'
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor='#c8880c'; (e.currentTarget as HTMLElement).style.color='#c8880c' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#3a2d10'; (e.currentTarget as HTMLElement).style.color='#6b5010' }}
-                >
+                  style={{ border: '2px dashed #3a2d10', borderRadius: '4px', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.75rem' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#c8880c'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}>
                   ✦ Ajouter un chemin
                 </button>
               )}
             </div>
           )}
 
-          {/* STEP: settings */}
+          {/* ══ ÉTAPE 3 : Paramètres ══ */}
           {step === 'settings' && (
             <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label style={labelStyle}>Fermeture des votes ✦</label>
-                  <input
-                    type="datetime-local"
-                    value={voteDeadline}
-                    onChange={e => setVoteDeadline(e.target.value)}
-                    min={new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16)}
-                    style={inputStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
-                    onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
-                  />
+
+              {/* Deadline */}
+              <div>
+                <label style={labelStyle}>Fermeture des votes ✦</label>
+
+                {/* Presets rapides */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {DEADLINE_PRESETS.map(p => (
+                    <button key={p.label} onClick={() => applyDeadlinePreset(p.ms)}
+                      className="px-3 py-1.5 rounded text-xs font-semibold transition"
+                      style={{ background: '#0e0c08', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#c8880c'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}>
+                      +{p.label}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <label style={labelStyle}>Révélation <span style={{ color:'#3a2d10', fontFamily:'inherit', fontWeight:400 }}>(facultatif)</span></label>
-                  <input
-                    type="datetime-local"
-                    value={revealDate}
-                    onChange={e => setRevealDate(e.target.value)}
-                    min={voteDeadline || new Date().toISOString().slice(0, 16)}
-                    style={inputStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
-                    onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
-                  />
-                </div>
+
+                <input
+                  type="datetime-local"
+                  value={voteDeadline}
+                  onChange={e => setVoteDeadline(e.target.value)}
+                  min={toLocalDatetimeString(new Date(Date.now() + 5 * 60000))}
+                  style={inputStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
+                />
+                {voteDeadline && (
+                  <p className="text-xs mt-1" style={{ color: '#6b5010' }}>
+                    Fermeture : {new Date(voteDeadline).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
 
+              {/* Date de révélation */}
+              <div>
+                <label style={labelStyle}>
+                  Révélation <span style={{ color: '#3a2d10', fontFamily: 'inherit', fontWeight: 400 }}>(facultatif)</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={revealDate}
+                  onChange={e => setRevealDate(e.target.value)}
+                  min={voteDeadline || toLocalDatetimeString(new Date())}
+                  style={inputStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
+                />
+              </div>
+
+              {/* Récompense */}
               <div>
                 <label style={labelStyle}>Récompense de base</label>
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-2 flex-wrap mb-2">
                   {[50, 100, 150, 250, 500].map(r => (
-                    <button
-                      key={r}
-                      onClick={() => setBaseReward(r)}
+                    <button key={r} onClick={() => { setBaseReward(r); setCustomReward('') }}
                       className="px-4 py-2 rounded text-sm font-semibold transition"
                       style={{
-                        background: baseReward === r ? 'linear-gradient(135deg, #a36808, #c8880c)' : '#0e0c08',
-                        border: `1px solid ${baseReward === r ? '#f5c842' : '#3a2d10'}`,
-                        color: baseReward === r ? '#0e0c08' : '#6b5010',
-                        fontFamily: '"Cinzel", serif',
-                        fontSize: '0.75rem',
-                      }}
-                    >
+                        background: baseReward === r && !customReward ? 'linear-gradient(135deg, #a36808, #c8880c)' : '#0e0c08',
+                        border: `1px solid ${baseReward === r && !customReward ? '#f5c842' : '#3a2d10'}`,
+                        color: baseReward === r && !customReward ? '#0e0c08' : '#6b5010',
+                        fontFamily: '"Cinzel", serif', fontSize: '0.75rem',
+                      }}>
                       {r} pts
                     </button>
                   ))}
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={customReward}
+                    onChange={e => handleCustomReward(e.target.value)}
+                    placeholder="Valeur personnalisée…"
+                    min={1} max={9999}
+                    style={{ ...inputStyle, flex: 1, padding: '8px 12px' }}
+                    onFocus={e => (e.currentTarget.style.borderColor = '#c8880c')}
+                    onBlur={e => (e.currentTarget.style.borderColor = '#6b5010')}
+                  />
+                  <span className="text-xs flex-shrink-0" style={{ color: '#6b5010' }}>pts</span>
+                </div>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <p className="text-sm font-semibold" style={{ fontFamily:'"Cinzel", serif', color:'#f0dfa8' }}>
+              {/* Pouvoirs */}
+              <div className="space-y-3 pt-1">
+                <p className="text-sm font-semibold" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>
                   Pouvoirs autorisés
                 </p>
                 {[
-                  { label: 'Boosts activés', desc: 'Correction, Double Vote, Bouclier', checked: allowBoosts, onChange: setAllowBoosts },
+                  { label: 'Boosts activés',    desc: 'Correction, Double Vote, Bouclier', checked: allowBoosts,   onChange: setAllowBoosts },
                   { label: 'Sabotages activés', desc: 'Les joueurs peuvent se nuire mutuellement', checked: allowSabotage, onChange: setAllowSabotage },
                 ].map(opt => (
-                  <label
-                    key={opt.label}
+                  <label key={opt.label}
                     className="flex items-center justify-between rounded px-4 py-3 cursor-pointer transition"
-                    style={{ background:'#0e0c08', border:'1px solid #2a2218' }}
+                    style={{ background: '#0e0c08', border: '1px solid #2a2218' }}
                     onMouseEnter={e => (e.currentTarget.style.borderColor = '#6b5010')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#2a2218')}
-                  >
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#2a2218')}>
                     <div>
-                      <p className="text-sm font-medium" style={{ color:'#f0dfa8' }}>{opt.label}</p>
-                      <p className="text-xs" style={{ color:'#6b5010' }}>{opt.desc}</p>
+                      <p className="text-sm font-medium" style={{ color: '#f0dfa8' }}>{opt.label}</p>
+                      <p className="text-xs" style={{ color: '#6b5010' }}>{opt.desc}</p>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={opt.checked}
+                    <input type="checkbox" checked={opt.checked}
                       onChange={e => opt.onChange(e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                      style={{ accentColor: '#c8880c' }}
-                    />
+                      className="w-4 h-4 cursor-pointer" style={{ accentColor: '#c8880c' }} />
                   </label>
                 ))}
               </div>
 
-              {/* Prophétie Aveugle */}
+              {/* Prophétie aveugle */}
               <div
                 className="rounded px-4 py-3 cursor-pointer transition"
-                style={{
-                  background: isAnonymous ? '#1a1208' : '#0e0c08',
-                  border: `1px solid ${isAnonymous ? '#c8880c' : '#2a2218'}`,
-                  boxShadow: isAnonymous ? '0 0 16px #c8880c20' : 'none',
-                }}
+                style={{ background: isAnonymous ? '#1a1208' : '#0e0c08', border: `1px solid ${isAnonymous ? '#c8880c' : '#2a2218'}`, boxShadow: isAnonymous ? '0 0 16px #c8880c20' : 'none' }}
                 onClick={() => setIsAnonymous(v => !v)}
-                onMouseEnter={e => !isAnonymous && ((e.currentTarget as HTMLElement).style.borderColor = '#6b5010')}
-                onMouseLeave={e => !isAnonymous && ((e.currentTarget as HTMLElement).style.borderColor = '#2a2218')}
-              >
+                onMouseEnter={e => { if (!isAnonymous) (e.currentTarget as HTMLElement).style.borderColor = '#6b5010' }}
+                onMouseLeave={e => { if (!isAnonymous) (e.currentTarget as HTMLElement).style.borderColor = '#2a2218' }}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span style={{ fontSize:'1.2rem', color: isAnonymous ? '#f5c842' : '#3a2d10' }}>◉</span>
+                    <span style={{ fontSize: '1.2rem', color: isAnonymous ? '#f5c842' : '#3a2d10' }}>◉</span>
                     <div>
-                      <p className="text-sm font-medium flex items-center gap-2" style={{ color:'#f0dfa8', fontFamily:'"Cinzel", serif' }}>
+                      <p className="text-sm font-medium flex items-center gap-2"
+                        style={{ color: '#f0dfa8', fontFamily: '"Cinzel", serif' }}>
                         Prophétie Aveugle
                         {isAnonymous && (
-                          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:'#c8880c22', border:'1px solid #c8880c', color:'#f5c842', letterSpacing:'0.06em' }}>
+                          <span className="text-xs px-2 py-0.5 rounded-full"
+                            style={{ background: '#c8880c22', border: '1px solid #c8880c', color: '#f5c842', letterSpacing: '0.06em' }}>
                             ACTIF
                           </span>
                         )}
                       </p>
-                      <p className="text-xs mt-0.5" style={{ color:'#6b5010' }}>
-                        Orakl garde le secret — les votes sont masqués pour tous jusqu'à la révélation
+                      <p className="text-xs mt-0.5" style={{ color: '#6b5010' }}>
+                        Orakl garde le secret — les votes sont masqués jusqu'à la révélation
                       </p>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={isAnonymous}
+                  <input type="checkbox" checked={isAnonymous}
                     onChange={e => setIsAnonymous(e.target.checked)}
                     onClick={e => e.stopPropagation()}
-                    className="w-4 h-4 cursor-pointer"
-                    style={{ accentColor: '#c8880c' }}
-                  />
+                    className="w-4 h-4 cursor-pointer" style={{ accentColor: '#c8880c' }} />
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP: review */}
+          {/* ══ ÉTAPE 4 : Revue ══ */}
           {step === 'review' && (
             <div className="space-y-4">
-              <div className="rounded p-4" style={{ background:'#0e0c08', border:'1px solid #3a2d10' }}>
-                <p className="text-xs uppercase tracking-wide mb-1" style={{ color:'#6b5010', fontFamily:'"Cinzel", serif' }}>Prophétie</p>
-                <p className="font-semibold" style={{ color:'#f0dfa8', fontFamily:'"Lora", serif', fontStyle:'italic' }}>« {question} »</p>
-                {context && <p className="text-sm mt-2" style={{ color:'#6b5010' }}>{context}</p>}
+              {/* Question */}
+              <div className="rounded p-4" style={{ background: '#0e0c08', border: '1px solid #3a2d10' }}>
+                <p className="text-xs uppercase tracking-wide mb-1.5" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
+                  Prophétie
+                </p>
+                <p className="font-semibold italic" style={{ color: '#f0dfa8', fontFamily: '"Lora", serif' }}>
+                  « {question} »
+                </p>
+                {context && (
+                  <p className="text-sm mt-2 italic" style={{ color: '#6b5010' }}>{context}</p>
+                )}
               </div>
 
-              <div className="rounded p-4" style={{ background:'#0e0c08', border:'1px solid #3a2d10' }}>
-                <p className="text-xs uppercase tracking-wide mb-3" style={{ color:'#6b5010', fontFamily:'"Cinzel", serif' }}>Les possibles</p>
+              {/* Options */}
+              <div className="rounded p-4" style={{ background: '#0e0c08', border: '1px solid #3a2d10' }}>
+                <p className="text-xs uppercase tracking-wide mb-3" style={{ color: '#6b5010', fontFamily: '"Cinzel", serif' }}>
+                  Les possibles ({filledOptions.length})
+                </p>
                 <div className="space-y-2">
-                  {options.filter(o => o.label.trim()).map((o, i) => (
-                    <div key={o.id} className="flex items-center gap-3">
-                      <span
-                        className="w-6 h-6 rounded flex items-center justify-center text-xs font-bold"
-                        style={{ background:'#1e1810', border:'1px solid #c8880c', color:'#c8880c', fontFamily:'"Cinzel", serif' }}
-                      >
+                  {filledOptions.map((o, i) => (
+                    <div key={o.id} className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ background: '#1e1810', border: '1px solid #c8880c', color: '#c8880c', fontFamily: '"Cinzel", serif' }}>
                         {i + 1}
                       </span>
-                      <span className="text-sm" style={{ color:'#f0dfa8' }}>{o.label}</span>
+                      <div>
+                        <p className="text-sm" style={{ color: '#f0dfa8' }}>{o.label}</p>
+                        {o.description && (
+                          <p className="text-xs" style={{ color: '#6b5010' }}>{o.description}</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Paramètres */}
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded p-3" style={{ background:'#0e0c08', border:'1px solid #3a2d10' }}>
-                  <p className="text-xs mb-1" style={{ color:'#6b5010' }}>Votes ferment</p>
-                  <p style={{ color:'#f0dfa8', fontSize:'0.8rem' }}>{voteDeadline ? new Date(voteDeadline).toLocaleString('fr-FR') : '-'}</p>
+                <div className="rounded p-3" style={{ background: '#0e0c08', border: '1px solid #3a2d10' }}>
+                  <p className="text-xs mb-1" style={{ color: '#6b5010' }}>⏳ Votes ferment</p>
+                  <p style={{ color: '#f0dfa8', fontSize: '0.8rem' }}>
+                    {voteDeadline ? new Date(voteDeadline).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
+                  </p>
                 </div>
-                <div className="rounded p-3" style={{ background:'#0e0c08', border:'1px solid #3a2d10' }}>
-                  <p className="text-xs mb-1" style={{ color:'#6b5010' }}>Récompense</p>
-                  <p className="font-bold" style={{ color:'#f5c842', fontFamily:'"Cinzel", serif' }}>{baseReward} pts</p>
+                <div className="rounded p-3" style={{ background: '#0e0c08', border: '1px solid #3a2d10' }}>
+                  <p className="text-xs mb-1" style={{ color: '#6b5010' }}>⚖ Récompense</p>
+                  <p className="font-bold" style={{ color: '#f5c842', fontFamily: '"Cinzel", serif' }}>
+                    {effectiveReward} pts
+                  </p>
                 </div>
+                {revealDate && (
+                  <div className="rounded p-3 col-span-2" style={{ background: '#0e0c08', border: '1px solid #3a2d10' }}>
+                    <p className="text-xs mb-1" style={{ color: '#6b5010' }}>◈ Révélation prévue</p>
+                    <p style={{ color: '#f0dfa8', fontSize: '0.8rem' }}>
+                      {new Date(revealDate).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )}
               </div>
 
+              {/* Badges options */}
               <div className="flex gap-2 text-xs flex-wrap">
                 {allowBoosts && (
-                  <span className="px-3 py-1 rounded-full" style={{ background:'#0e0c08', border:'1px solid #3a2d10', color:'#6b5010' }}>
+                  <span className="px-3 py-1 rounded-full" style={{ background: '#0e0c08', border: '1px solid #3a2d10', color: '#6b5010' }}>
                     Boosts activés
                   </span>
                 )}
                 {allowSabotage && (
-                  <span className="px-3 py-1 rounded-full" style={{ background:'#0e0c08', border:'1px solid #3a2d10', color:'#6b5010' }}>
+                  <span className="px-3 py-1 rounded-full" style={{ background: '#0e0c08', border: '1px solid #3a2d10', color: '#6b5010' }}>
                     Sabotages activés
                   </span>
                 )}
                 {isAnonymous && (
-                  <span className="px-3 py-1 rounded-full flex items-center gap-1" style={{ background:'#1a1208', border:'1px solid #c8880c', color:'#f5c842', fontFamily:'"Cinzel", serif' }}>
+                  <span className="px-3 py-1 rounded-full flex items-center gap-1"
+                    style={{ background: '#1a1208', border: '1px solid #c8880c', color: '#f5c842', fontFamily: '"Cinzel", serif' }}>
                     ◉ Prophétie Aveugle
+                  </span>
+                )}
+                {!allowBoosts && !allowSabotage && !isAnonymous && (
+                  <span className="px-3 py-1 rounded-full" style={{ background: '#0e0c08', border: '1px solid #2a2218', color: '#3a2d10' }}>
+                    Mode standard
                   </span>
                 )}
               </div>
 
               {error && (
-                <div className="rounded px-4 py-3 text-sm" style={{ background:'#2a0c0c', border:'1px solid #6b2020', color:'#e05050' }}>
+                <div className="rounded px-4 py-3 text-sm"
+                  style={{ background: '#2a0c0c', border: '1px solid #6b2020', color: '#e05050' }}>
                   {error}
                 </div>
               )}
@@ -495,73 +617,54 @@ export default function CreatePredictionPage() {
           )}
         </div>
 
-        {/* Navigation buttons */}
+        {/* ── Navigation ── */}
         <div className="flex justify-between items-center mt-6">
-          <button
-            onClick={goPrev}
+          <button onClick={goPrev}
             disabled={stepIndex === 0}
             className="px-5 py-2.5 rounded text-sm font-medium transition"
-            style={{
-              border:'1px solid #3a2d10',
-              color: stepIndex === 0 ? '#2a1810' : '#6b5010',
-              fontFamily:'"Cinzel", serif',
-              fontSize:'0.75rem',
-              cursor: stepIndex === 0 ? 'not-allowed' : 'pointer',
-              background:'transparent',
-            }}
-            onMouseEnter={e => { if (stepIndex > 0) { (e.currentTarget as HTMLElement).style.borderColor='#6b5010'; (e.currentTarget as HTMLElement).style.color='#c8880c' }}}
-            onMouseLeave={e => { if (stepIndex > 0) { (e.currentTarget as HTMLElement).style.borderColor='#3a2d10'; (e.currentTarget as HTMLElement).style.color='#6b5010' }}}
-          >
+            style={{ border: '1px solid #3a2d10', color: stepIndex === 0 ? '#2a1810' : '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.75rem', cursor: stepIndex === 0 ? 'not-allowed' : 'pointer', background: 'transparent' }}
+            onMouseEnter={e => { if (stepIndex > 0) { (e.currentTarget as HTMLElement).style.borderColor = '#6b5010'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}}
+            onMouseLeave={e => { if (stepIndex > 0) { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}}>
             ← Précédent
           </button>
 
           {step !== 'review' ? (
-            <button
-              onClick={goNext}
+            <button onClick={goNext}
               disabled={!canGoNext()}
               className="px-6 py-2.5 rounded text-sm font-semibold transition"
               style={{
                 background: canGoNext() ? 'linear-gradient(135deg, #a36808, #c8880c)' : '#2a2218',
                 color: canGoNext() ? '#0e0c08' : '#3a2d10',
-                fontFamily:'"Cinzel", serif',
-                fontSize:'0.75rem',
+                fontFamily: '"Cinzel", serif', fontSize: '0.75rem',
                 border: `1px solid ${canGoNext() ? '#f5c842' : '#3a2d10'}`,
                 cursor: canGoNext() ? 'pointer' : 'not-allowed',
-                letterSpacing:'0.06em',
-              }}
-            >
+                letterSpacing: '0.06em',
+              }}>
               Suivant →
             </button>
           ) : (
             <div className="flex gap-3">
-              <button
-                onClick={() => handleSubmit(false)}
+              <button onClick={() => handleSubmit(false)}
                 disabled={isLoading}
                 className="px-5 py-2.5 rounded text-sm font-medium transition"
-                style={{ border:'1px solid #3a2d10', color:'#6b5010', fontFamily:'"Cinzel", serif', fontSize:'0.7rem', background:'transparent' }}
-              >
+                style={{ border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.7rem', background: 'transparent' }}>
                 Brouillon
               </button>
-              <button
-                onClick={() => handleSubmit(true)}
+              <button onClick={() => handleSubmit(true)}
                 disabled={isLoading}
                 className="px-6 py-2.5 rounded text-sm font-semibold transition flex items-center gap-2"
                 style={{
                   background: 'linear-gradient(135deg, #a36808, #c8880c, #e6a817)',
-                  color:'#0e0c08',
-                  fontFamily:'"Cinzel", serif',
-                  fontSize:'0.75rem',
-                  border:'1px solid #f5c842',
-                  letterSpacing:'0.06em',
+                  color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.75rem',
+                  border: '1px solid #f5c842', letterSpacing: '0.06em',
                   cursor: isLoading ? 'not-allowed' : 'pointer',
-                  boxShadow:'0 0 20px #c8880c40',
-                }}
-              >
+                  boxShadow: '0 0 20px #c8880c40',
+                }}>
                 {isLoading && (
                   <span className="w-4 h-4 rounded-full border-2 animate-spin"
-                    style={{ borderColor:'#0e0c08', borderTopColor:'transparent' }} />
+                    style={{ borderColor: '#0e0c08', borderTopColor: 'transparent' }} />
                 )}
-                {isLoading ? 'Invocation...' : '✦ Sceller et Partager'}
+                {isLoading ? 'Invocation…' : '✦ Sceller et Partager'}
               </button>
             </div>
           )}

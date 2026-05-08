@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePageTitle } from '../../hooks/usePageTitle'
+import { Link } from 'react-router-dom'
 import { userService, type LeaderboardEntry } from '../../services/userService'
 import Navbar from '../../components/layout/Navbar'
+import { SkeletonRankRow } from '../../components/ui/SkeletonCard'
 
 const pageStyle = { background: '#0e0c08', minHeight: '100vh', color: '#f0dfa8' }
 
@@ -83,6 +86,7 @@ function PodiumCard({ entry, rank }: { entry: LeaderboardEntry; rank: 1 | 2 | 3 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
+  usePageTitle('Classement')
   const [entries, setEntries]   = useState<LeaderboardEntry[]>([])
   const [myRank, setMyRank]     = useState<number | undefined>()
   const [isLoading, setIsLoading] = useState(true)
@@ -150,9 +154,8 @@ export default function LeaderboardPage() {
         </div>
 
         {isLoading && (
-          <div className="flex items-center justify-center h-60">
-            <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+          <div className="space-y-2">
+            {[...Array(8)].map((_, i) => <SkeletonRankRow key={i} />)}
           </div>
         )}
 
@@ -263,10 +266,21 @@ export default function LeaderboardPage() {
             )}
 
             {entries.length === 0 && (
-              <div className="text-center py-16">
-                <p className="text-4xl mb-3" style={{ color: '#c8880c' }}>⚖</p>
-                <p className="font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#f0dfa8' }}>Orakl observe le vide</p>
-                <p className="text-sm" style={{ color: '#6b5010' }}>Sois le premier à mériter son regard.</p>
+              <div className="text-center py-16 rounded"
+                style={{ background: '#161209', border: '1px solid #2a2218', backgroundImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, #c8880c06 0%, transparent 70%)' }}>
+                <p className="text-5xl mb-4" style={{ color: '#c8880c', fontFamily: '"Cinzel", serif' }}>⚖</p>
+                <p className="font-bold text-lg mb-2" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#f0dfa8' }}>
+                  Orakl observe le vide
+                </p>
+                <p className="text-sm mb-6" style={{ color: '#6b5010', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+                  Aucun initié n'a encore prouvé sa valeur.<br />Sois le premier à mériter son regard.
+                </p>
+                <Link
+                  to="/create"
+                  className="inline-block font-bold py-3 px-8 rounded transition"
+                  style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842', letterSpacing: '0.06em' }}>
+                  ✦ Invoquer le premier pronostic
+                </Link>
               </div>
             )}
           </>

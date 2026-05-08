@@ -1,8 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { usePageTitle } from '../../hooks/usePageTitle'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Navbar from '../../components/layout/Navbar'
 import { userService, type HistoryItem, type ProfileData } from '../../services/userService'
+import { SkeletonCard } from '../../components/ui/SkeletonCard'
 
 // ─── Constantes marketing ────────────────────────────────────────────────────
 
@@ -200,9 +202,8 @@ function Dashboard() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-10">
-          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            style={{ borderColor: '#c8880c', borderTopColor: 'transparent' }} />
+        <div className="space-y-3 px-4 py-6 max-w-2xl mx-auto">
+          {[...Array(4)].map((_, i) => <SkeletonCard key={i} lines={2} />)}
         </div>
       ) : (
         <>
@@ -240,17 +241,31 @@ function Dashboard() {
             </section>
           )}
 
-          {/* Message vide si rien du tout */}
+          {/* État vide — aucune prophétie */}
           {actionItems.length === 0 && recentItems.length === 0 && (
-            <div className="text-center py-8 rounded"
-              style={{ background: '#161209', border: '1px solid #2a2218' }}>
-              <p className="text-3xl mb-2" style={{ color: '#3a2d10' }}>◈</p>
-              <p className="text-sm font-semibold mb-1" style={{ fontFamily: '"Cinzel", serif', color: '#6b5010' }}>
-                Aucune prophétie pour l'instant
+            <div className="text-center py-12 rounded"
+              style={{ background: '#161209', border: '1px solid #2a2218', backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, #c8880c08 0%, transparent 70%)' }}>
+              <p className="text-5xl mb-4" style={{ color: '#3a2d10', fontFamily: '"Cinzel", serif' }}>✦</p>
+              <p className="text-base font-bold mb-2" style={{ fontFamily: '"Cinzel Decorative", serif', color: '#6b5010' }}>
+                Le Cercle vous attend
               </p>
-              <p className="text-xs mb-4" style={{ color: '#2a2218' }}>
-                Crée ou rejoins ton premier pronostic.
+              <p className="text-sm mb-6" style={{ color: '#3a2d10', fontFamily: '"Lora", serif', fontStyle: 'italic' }}>
+                Aucune prophétie pour l'instant.<br />Invoquez-en une ou rejoignez celle d'un ami.
               </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center px-4">
+                <Link to="/create"
+                  className="font-bold py-3 px-6 rounded transition"
+                  style={{ background: 'linear-gradient(135deg, #a36808, #c8880c)', color: '#0e0c08', fontFamily: '"Cinzel", serif', fontSize: '0.8rem', border: '1px solid #f5c842', letterSpacing: '0.06em', boxShadow: '0 0 20px #c8880c30' }}>
+                  ✦ Créer un pronostic
+                </Link>
+                <Link to="/leaderboard"
+                  className="font-semibold py-3 px-6 rounded transition"
+                  style={{ background: '#0e0c08', border: '1px solid #3a2d10', color: '#6b5010', fontFamily: '"Cinzel", serif', fontSize: '0.8rem' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#6b5010'; (e.currentTarget as HTMLElement).style.color = '#c8880c' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#3a2d10'; (e.currentTarget as HTMLElement).style.color = '#6b5010' }}>
+                  Voir le Classement
+                </Link>
+              </div>
             </div>
           )}
         </>
@@ -492,6 +507,7 @@ function MarketingPage() {
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  usePageTitle('')
   const { isAuthenticated } = useAuth()
 
   return (
