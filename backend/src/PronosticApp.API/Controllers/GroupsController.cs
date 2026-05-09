@@ -88,8 +88,10 @@ public class GroupsController : ControllerBase
             OwnerId     = UserId,
         };
 
-        // Le créateur est automatiquement Admin du groupe
-        group.Members.Add(new GroupMember
+        _db.Groups.Add(group);
+
+        // Ajouter le créateur comme Admin via le DbSet — pattern cohérent avec Join
+        _db.GroupMembers.Add(new GroupMember
         {
             GroupId  = group.Id,
             UserId   = UserId,
@@ -97,7 +99,6 @@ public class GroupsController : ControllerBase
             JoinedAt = DateTime.UtcNow,
         });
 
-        _db.Groups.Add(group);
         await _db.SaveChangesAsync();
 
         // Recharger avec les navigations pour la réponse
@@ -119,30 +120,33 @@ public class GroupsController : ControllerBase
         if (string.IsNullOrEmpty(code))
             return BadRequest(new { message = "Code d'invitation manquant." });
 
+        // AsNoTracking : on lit sans attacher l'entité au tracker EF Core,
+        // pour éviter le DbUpdateConcurrencyException lors du SaveChanges suivant.
         var group = await _db.Groups
-            .Include(g => g.Owner)
-            .Include(g => g.Members).ThenInclude(m => m.User)
-            .Include(g => g.Messages).ThenInclude(m => m.Sender)
+            .AsNoTracking()
             .FirstOrDefaultAsync(g => g.InviteCode == code);
 
         if (group == null)
             return NotFound(new { message = "Aucun cercle trouvé avec ce code." });
 
-        // Déjà membre ?
-        if (group.Members.Any(m => m.UserId == UserId))
-            return Ok(ToGroupResponse(group));
+        // Vérifier l'appartenance via une requête directe (données fraîches)
+        var isMember = await _db.GroupMembers
+            .AnyAsync(m => m.GroupId == group.Id && m.UserId == UserId);
 
-        group.Members.Add(new GroupMember
+        if (!isMember)
         {
-            GroupId  = group.Id,
-            UserId   = UserId,
-            Role     = GroupRole.Member,
-            JoinedAt = DateTime.UtcNow,
-        });
+            // Ajout direct au DbSet — évite tout conflit avec le tracker du Group
+            _db.GroupMembers.Add(new GroupMember
+            {
+                GroupId  = group.Id,
+                UserId   = UserId,
+                Role     = GroupRole.Member,
+                JoinedAt = DateTime.UtcNow,
+            });
+            await _db.SaveChangesAsync();
+        }
 
-        await _db.SaveChangesAsync();
-
-        // Recharger pour avoir les navigations à jour
+        // Recharger avec toutes les navigations pour la réponse
         var updated = await _db.Groups
             .Include(g => g.Owner)
             .Include(g => g.Members).ThenInclude(m => m.User)
